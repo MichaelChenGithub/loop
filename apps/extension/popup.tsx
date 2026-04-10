@@ -1,3 +1,5 @@
+import { AppIcon } from "./src/AppIcon";
+
 export default function Popup() {
   return (
     <main
@@ -7,14 +9,22 @@ export default function Popup() {
         fontFamily:
           '"IBM Plex Sans", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
       }}>
-      <h1
+      <div
         style={{
-          margin: 0,
-          fontSize: "18px",
-          color: "#0f172a"
+          display: "flex",
+          alignItems: "center",
+          gap: "12px"
         }}>
-        Loop Extension
-      </h1>
+        <AppIcon decorative size={34} style={{ borderRadius: "8px" }} />
+        <h1
+          style={{
+            margin: 0,
+            fontSize: "18px",
+            color: "#0f172a"
+          }}>
+          Loop Extension
+        </h1>
+      </div>
       <p
         style={{
           margin: "8px 0 0",

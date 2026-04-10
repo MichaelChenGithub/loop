@@ -124,11 +124,28 @@ describe("overlay ui", () => {
 
     expect(html).toContain("Loop");
     expect(html).toContain("Interviewer");
+    expect(html).toContain("data-app-icon=\"true\"");
     expect(html).toContain("Two Sum");
     expect(html).toContain("aria-label=\"Session connected\"");
     expect(html).toContain("left:64px");
     expect(html).toContain("top:48px");
     expect(html).toContain(">End<");
     expect(html).toContain(">Mute mic<");
+  });
+
+  it("keeps the collapsed toolbar free of branding artwork", () => {
+    const html = renderToStaticMarkup(
+      createElement(CollapsedToolbar, {
+        state: baseState,
+        pageTone: "dark",
+        timerText: "02:05",
+        statusLabel: "Session connected",
+        onMuteToggle: () => undefined,
+        onEnd: () => undefined,
+        onExpand: () => undefined
+      })
+    );
+
+    expect(html).not.toContain("data-app-icon=\"true\"");
   });
 });
