@@ -1,6 +1,41 @@
 import type { ProblemPayloadForBackend } from "./leetcode-page";
+import {
+  createRealtimeToolDispatcher,
+  type RealtimeToolDispatcher,
+  type RealtimeToolResult
+} from "./realtime-tool-dispatch";
 
 const OPENAI_REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
+
+type RealtimeDataChannel = Pick<RTCDataChannel, "send" | "onmessage">;
+
+type RealtimeFunctionCallEvent = {
+  type: "response.function_call_arguments.done";
+  call_id: string;
+  name: string;
+  arguments: string;
+};
+
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const isRealtimeFunctionCallEvent = (
+  value: unknown
+): value is RealtimeFunctionCallEvent =>
+  isObject(value) &&
+  value.type === "response.function_call_arguments.done" &&
+  typeof value.call_id === "string" &&
+  typeof value.name === "string" &&
+  typeof value.arguments === "string";
+
+const parseToolArguments = (rawArguments: string): Record<string, unknown> | null => {
+  try {
+    const parsed = JSON.parse(rawArguments) as unknown;
+    return isObject(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
 
 const readRealtimeError = async (response: Response): Promise<string> => {
   const contentType = response.headers.get("Content-Type") ?? "";
@@ -37,6 +72,16 @@ export class RealtimeSession {
   private pc: RTCPeerConnection | null = null;
   private micStream: MediaStream | null = null;
   private audioEl: HTMLAudioElement | null = null;
+  private dataChannel: RealtimeDataChannel | null = null;
+  private toolDispatcher: RealtimeToolDispatcher;
+
+  constructor({
+    toolDispatcher = createRealtimeToolDispatcher()
+  }: {
+    toolDispatcher?: RealtimeToolDispatcher;
+  } = {}) {
+    this.toolDispatcher = toolDispatcher;
+  }
 
   async start(clientSecretValue: string, model: string): Promise<void> {
     this.pc = new RTCPeerConnection();
@@ -51,7 +96,10 @@ export class RealtimeSession {
       }
     };
 
-    this.pc.createDataChannel("oai-events");
+    this.dataChannel = this.pc.createDataChannel("oai-events");
+    this.dataChannel.onmessage = (event) => {
+      void this.handleDataChannelMessage(event.data);
+    };
 
     this.micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     for (const track of this.micStream.getTracks()) {
@@ -101,6 +149,57 @@ export class RealtimeSession {
     this.pc = null;
     this.micStream = null;
     this.audioEl = null;
+    this.dataChannel = null;
+  }
+
+  private async handleDataChannelMessage(rawData: unknown): Promise<void> {
+    if (typeof rawData !== "string") {
+      return;
+    }
+
+    let event: unknown;
+
+    try {
+      event = JSON.parse(rawData) as unknown;
+    } catch {
+      console.warn("[loop] Ignoring malformed Realtime data channel event");
+      return;
+    }
+
+    if (!isRealtimeFunctionCallEvent(event)) {
+      return;
+    }
+
+    const parsedArguments = parseToolArguments(event.arguments);
+
+    if (!parsedArguments) {
+      console.warn("[loop] Ignoring tool call with malformed arguments", event.name);
+      return;
+    }
+
+    let output: RealtimeToolResult;
+
+    try {
+      output = await this.toolDispatcher.dispatch({
+        name: event.name,
+        arguments: parsedArguments
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown tool failure";
+      console.error("[loop] Tool dispatch failed", error);
+      output = { ok: false, error: message };
+    }
+
+    this.dataChannel?.send(
+      JSON.stringify({
+        type: "conversation.item.create",
+        item: {
+          type: "function_call_output",
+          call_id: event.call_id,
+          output: JSON.stringify(output)
+        }
+      })
+    );
   }
 }
 

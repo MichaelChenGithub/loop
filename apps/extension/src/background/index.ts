@@ -1,16 +1,18 @@
 import {
   CAPTURE_LATEST_CODE_SNAPSHOT_MESSAGE_TYPE,
+  GET_LATEST_CODE_SNAPSHOT_MESSAGE_TYPE,
   READ_LATEST_CODE_SNAPSHOT_FROM_PAGE_MESSAGE_TYPE,
   type CaptureLatestCodeSnapshotResponse,
   type LatestCodeSnapshot
 } from "../code-snapshot";
 
 export type CurrentCodeContextToolOutput = {
-  code: string;
+  available: boolean;
+  code: string | null;
   language: string | null;
   problemSlug: string | null;
-  capturedAt: string;
-  source: "leetcode-editor";
+  capturedAt: string | null;
+  source: "leetcode-editor" | null;
 };
 
 let latestCodeSnapshot: LatestCodeSnapshot | null = null;
@@ -39,12 +41,23 @@ export const clearLatestCodeSnapshot = (): void => {
 export const buildCurrentCodeContextToolOutput = (
   snapshot: LatestCodeSnapshot
 ): CurrentCodeContextToolOutput => ({
+  available: true,
   code: snapshot.code,
   language: snapshot.language,
   problemSlug: snapshot.problemSlug,
   capturedAt: snapshot.updatedAt,
   source: snapshot.source
 });
+
+export const buildEmptyCurrentCodeContextToolOutput =
+  (): CurrentCodeContextToolOutput => ({
+    available: false,
+    code: null,
+    language: null,
+    problemSlug: null,
+    capturedAt: null,
+    source: null
+  });
 
 export const installBackgroundMessageHandlers = ({
   runtime = chrome.runtime,
@@ -57,6 +70,13 @@ export const installBackgroundMessageHandlers = ({
   // Keep the canonical snapshot here so future Realtime tool calling can read
   // from background instead of depending on page-local React/content-script state.
   runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message?.type === GET_LATEST_CODE_SNAPSHOT_MESSAGE_TYPE) {
+      (sendResponse as MessageResponder)({
+        snapshot: getLatestCodeSnapshot()
+      } satisfies CaptureLatestCodeSnapshotResponse);
+      return false;
+    }
+
     if (message?.type !== CAPTURE_LATEST_CODE_SNAPSHOT_MESSAGE_TYPE) {
       return undefined;
     }
