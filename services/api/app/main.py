@@ -5,6 +5,7 @@ from typing import Any
 
 import httpx
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.realtime import RealtimeClientSecretBroker
 from app.core.settings import get_settings
@@ -37,11 +38,15 @@ def _default_session_creator() -> dict[str, Any]:
         model=settings.openai_realtime_model,
         voice=settings.openai_realtime_voice,
         instructions=settings.openai_realtime_instructions,
+        max_interview_seconds=settings.max_interview_seconds,
     )
     try:
         return broker.create()
+    except httpx.HTTPStatusError as exc:
+        body = exc.response.text
+        raise HTTPException(status_code=502, detail=f"OpenAI error {exc.response.status_code}: {body}") from exc
     except httpx.HTTPError as exc:
-        raise HTTPException(status_code=502, detail="Failed to create realtime session") from exc
+        raise HTTPException(status_code=502, detail=f"Request error: {exc}") from exc
 
 
 def create_app(
@@ -49,6 +54,12 @@ def create_app(
     create_session: Callable[[], dict[str, Any]] | None = None,
 ) -> FastAPI:
     app = FastAPI(title="loop api")
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["https://leetcode.com", "https://www.leetcode.com"],
+        allow_methods=["POST"],
+    )
 
     session_creator = create_session or _default_session_creator
 

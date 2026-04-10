@@ -1,5 +1,4 @@
 import type { PlasmoCSConfig } from "plasmo";
-import { createRoot, type Root } from "react-dom/client";
 
 import { InterviewOverlay } from "../InterviewOverlay";
 import {
@@ -16,44 +15,30 @@ export const config: PlasmoCSConfig = {
   matches: ["https://leetcode.com/*", "https://www.leetcode.com/*"]
 };
 
-let overlayRoot: Root | null = null;
+export const getRootContainer = (): HTMLElement => {
+  const existing = document.getElementById(HOST_ID);
 
-const createHost = (): HTMLDivElement => {
-  const existingHost = document.getElementById(HOST_ID);
-
-  if (existingHost instanceof HTMLDivElement) {
-    return existingHost;
+  if (existing instanceof HTMLDivElement) {
+    return existing.shadowRoot!.getElementById(ROOT_ID) as HTMLElement;
   }
 
   const host = document.createElement("div");
   host.id = HOST_ID;
-  host.style.position = "fixed";
-  host.style.top = "0";
-  host.style.left = "0";
-  host.style.width = "0";
-  host.style.height = "0";
-  host.style.zIndex = "2147483647";
-  host.style.pointerEvents = "none";
+  host.style.cssText =
+    "position:fixed;top:0;left:0;width:0;height:0;z-index:2147483647;pointer-events:none;";
 
-  const shadowRoot = host.attachShadow({ mode: "open" });
+  const shadow = host.attachShadow({ mode: "open" });
+
   const style = document.createElement("style");
   style.textContent = `
-    :host {
-      all: initial;
-    }
-
-    #${ROOT_ID} {
-      position: static;
-      width: 0;
-      height: 0;
-      pointer-events: none;
-    }
+    :host { all: initial; }
+    #${ROOT_ID} { position: static; width: 0; height: 0; pointer-events: none; }
   `;
 
-  const rootContainer = document.createElement("div");
-  rootContainer.id = ROOT_ID;
+  const container = document.createElement("div");
+  container.id = ROOT_ID;
 
-  shadowRoot.append(style, rootContainer);
+  shadow.append(style, container);
   document.body.appendChild(host);
 
   return host;
@@ -153,4 +138,4 @@ const startOverlayLifecycle = () => {
   };
 };
 
-startOverlayLifecycle();
+export default InterviewOverlay;
