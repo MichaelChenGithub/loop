@@ -6,17 +6,21 @@ export const SESSION_STATUSES = [
 ] as const;
 
 export type SessionStatus = (typeof SESSION_STATUSES)[number];
+export const BASE_CONTROL_MODES = ["launcher", "collapsed"] as const;
+export type BaseControlMode = (typeof BASE_CONTROL_MODES)[number];
 
 export type InterviewShellState = {
-  isPanelOpen: boolean;
+  baseControlMode: BaseControlMode;
   isMuted: boolean;
+  isPanelExpanded: boolean;
   sessionStatus: SessionStatus;
   remainingSeconds: number;
 };
 
 export const createInitialInterviewShellState = (): InterviewShellState => ({
-  isPanelOpen: false,
+  baseControlMode: "launcher",
   isMuted: false,
+  isPanelExpanded: false,
   sessionStatus: "idle",
   remainingSeconds: 0
 });
@@ -25,15 +29,17 @@ export const openPanel = (
   state: InterviewShellState
 ): InterviewShellState => ({
   ...state,
-  isPanelOpen: true
+  isPanelExpanded: true
 });
 
 export const closePanel = (
   state: InterviewShellState
 ): InterviewShellState => ({
   ...state,
-  isPanelOpen: false
+  isPanelExpanded: false
 });
+
+export const collapseToToolbar = closePanel;
 
 export const toggleMute = (
   state: InterviewShellState
@@ -47,6 +53,8 @@ export const startSession = (
   state: InterviewShellState
 ): InterviewShellState => ({
   ...state,
+  baseControlMode: "launcher",
+  isPanelExpanded: true,
   sessionStatus: "connecting"
 });
 
@@ -56,6 +64,8 @@ export const confirmConnected = (
   remainingSeconds: number
 ): InterviewShellState => ({
   ...state,
+  baseControlMode: "collapsed",
+  isPanelExpanded: false,
   sessionStatus: "connected",
   remainingSeconds
 });
@@ -65,6 +75,8 @@ export const sessionFailed = (
   state: InterviewShellState
 ): InterviewShellState => ({
   ...state,
+  baseControlMode: "launcher",
+  isPanelExpanded: true,
   sessionStatus: "idle",
   remainingSeconds: 0
 });
@@ -73,6 +85,8 @@ export const endSession = (
   state: InterviewShellState
 ): InterviewShellState => ({
   ...state,
+  baseControlMode: "launcher",
+  isPanelExpanded: true,
   sessionStatus: "ended",
   remainingSeconds: 0
 });
@@ -87,7 +101,13 @@ export const tickTimer = (
   const next = state.remainingSeconds - 1;
 
   if (next <= 0) {
-    return { ...state, sessionStatus: "ended", remainingSeconds: 0 };
+    return {
+      ...state,
+      baseControlMode: "launcher",
+      isPanelExpanded: true,
+      sessionStatus: "ended",
+      remainingSeconds: 0
+    };
   }
 
   return { ...state, remainingSeconds: next };

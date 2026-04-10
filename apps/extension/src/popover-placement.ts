@@ -26,7 +26,6 @@ export const computePopoverPlacement = (
     anchorRect.bottom + POPOVER_GAP + popoverSize.height <=
     viewport.height - VIEWPORT_PADDING;
   const fitsRightAligned = anchorRect.right - popoverSize.width >= VIEWPORT_PADDING;
-
   const top = fitsBelow
     ? anchorRect.bottom + POPOVER_GAP
     : anchorRect.top - popoverSize.height - POPOVER_GAP;
