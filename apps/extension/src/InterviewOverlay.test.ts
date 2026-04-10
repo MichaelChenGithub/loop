@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   getAnchorWrapperStyle,
   resolvePanelAnchorRect,
-  resolvePageTone
+  resolvePageTone,
+  startInterviewSessionAttempt
 } from "./InterviewOverlay";
 
 describe("resolvePageTone", () => {
@@ -52,5 +53,70 @@ describe("resolvePanelAnchorRect", () => {
       width: 180,
       right: 1180
     });
+  });
+});
+
+describe("startInterviewSessionAttempt", () => {
+  it("captures the latest code snapshot before creating the session", async () => {
+    const captureLatestCodeSnapshot = vi.fn().mockResolvedValue({ snapshot: null });
+    const fetchClientSecret = vi.fn().mockResolvedValue({
+      value: "ek_123",
+      expires_at: 1_900_000_000,
+      session: {
+        id: "sess_123",
+        model: "gpt-realtime",
+        object: "realtime.session",
+        type: "realtime"
+      }
+    });
+    const session = { start: vi.fn().mockResolvedValue(undefined) };
+    const createRealtimeSession = vi.fn(() => session);
+
+    await startInterviewSessionAttempt({
+      captureLatestCodeSnapshot,
+      fetchClientSecret,
+      createRealtimeSession,
+      apiBaseUrl: "http://localhost:8000",
+      locationHref: "https://leetcode.com/problems/two-sum/",
+      problem: null,
+      nowMs: 1_800_000_000_000
+    });
+
+    expect(captureLatestCodeSnapshot).toHaveBeenCalledTimes(1);
+    expect(fetchClientSecret).toHaveBeenCalledTimes(1);
+    expect(createRealtimeSession).toHaveBeenCalledTimes(1);
+    expect(session.start).toHaveBeenCalledTimes(1);
+    expect(captureLatestCodeSnapshot.mock.invocationCallOrder[0]).toBeLessThan(
+      fetchClientSecret.mock.invocationCallOrder[0]
+    );
+  });
+
+  it("continues starting the session when the pre-start capture fails", async () => {
+    const captureLatestCodeSnapshot = vi.fn().mockRejectedValue(new Error("capture failed"));
+    const fetchClientSecret = vi.fn().mockResolvedValue({
+      value: "ek_123",
+      expires_at: 1_900_000_000,
+      session: {
+        id: "sess_123",
+        model: "gpt-realtime",
+        object: "realtime.session",
+        type: "realtime"
+      }
+    });
+    const session = { start: vi.fn().mockResolvedValue(undefined) };
+
+    const result = await startInterviewSessionAttempt({
+      captureLatestCodeSnapshot,
+      fetchClientSecret,
+      createRealtimeSession: () => session,
+      apiBaseUrl: "http://localhost:8000",
+      locationHref: "https://leetcode.com/problems/two-sum/",
+      problem: null,
+      nowMs: 1_800_000_000_000
+    });
+
+    expect(fetchClientSecret).toHaveBeenCalledTimes(1);
+    expect(session.start).toHaveBeenCalledTimes(1);
+    expect(result.remainingSeconds).toBe(100_000_000);
   });
 });

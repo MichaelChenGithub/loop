@@ -9,6 +9,7 @@ import {
   buildCurrentCodeContextToolOutput,
   clearLatestCodeSnapshot,
   getLatestCodeSnapshot,
+  hasMeaningfulSnapshotChange,
   installBackgroundMessageHandlers,
   setLatestCodeSnapshot
 } from "./index";
@@ -41,6 +42,49 @@ describe("latest code snapshot state", () => {
     setLatestCodeSnapshot(nextSnapshot);
 
     expect(getLatestCodeSnapshot()).toEqual(nextSnapshot);
+  });
+
+  it("does not overwrite the stored snapshot when only updatedAt changes", () => {
+    const existingSnapshot = makeSnapshot("print('first')");
+    setLatestCodeSnapshot(existingSnapshot);
+
+    setLatestCodeSnapshot({
+      ...existingSnapshot,
+      updatedAt: "2026-04-10T15:31:00.000Z"
+    });
+
+    expect(getLatestCodeSnapshot()).toEqual(existingSnapshot);
+  });
+});
+
+describe("hasMeaningfulSnapshotChange", () => {
+  it("returns false when snapshots only differ by updatedAt", () => {
+    const currentSnapshot = makeSnapshot("print('captured')");
+
+    expect(
+      hasMeaningfulSnapshotChange(currentSnapshot, {
+        ...currentSnapshot,
+        updatedAt: "2026-04-10T15:31:00.000Z"
+      })
+    ).toBe(false);
+  });
+
+  it("returns true when the captured code changes", () => {
+    expect(
+      hasMeaningfulSnapshotChange(
+        makeSnapshot("print('captured')"),
+        makeSnapshot("print('updated')")
+      )
+    ).toBe(true);
+  });
+
+  it("returns true when the problem slug changes", () => {
+    expect(
+      hasMeaningfulSnapshotChange(makeSnapshot("print('captured')"), {
+        ...makeSnapshot("print('captured')"),
+        problemSlug: "add-two-numbers"
+      })
+    ).toBe(true);
   });
 });
 
