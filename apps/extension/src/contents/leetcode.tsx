@@ -1,6 +1,7 @@
 import type { PlasmoCSConfig } from "plasmo";
 
 import { InterviewOverlay } from "../InterviewOverlay";
+import { installLatestCodeSnapshotPageReader } from "../code-snapshot-runtime";
 
 const HOST_ID = "loop-interviewer-host";
 const ROOT_ID = "loop-interviewer-root";
@@ -8,6 +9,8 @@ const ROOT_ID = "loop-interviewer-root";
 export const config: PlasmoCSConfig = {
   matches: ["https://leetcode.com/*", "https://www.leetcode.com/*"]
 };
+
+installLatestCodeSnapshotPageReader();
 
 export const getRootContainer = (): HTMLElement => {
   const existing = document.getElementById(HOST_ID);
