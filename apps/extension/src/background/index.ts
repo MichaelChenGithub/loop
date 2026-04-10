@@ -72,6 +72,29 @@ export const buildEmptyCurrentCodeContextToolOutput =
     source: null
   });
 
+const logRealtimeToolCall = (snapshot: LatestCodeSnapshot | null): void => {
+  console.log("[loop] Realtime tool call", {
+    tool: "get_current_code_context",
+    available: snapshot !== null,
+    problemSlug: snapshot?.problemSlug ?? null
+  });
+};
+
+const logRealtimeToolResult = (output: CurrentCodeContextToolOutput): void => {
+  console.log("[loop] Realtime tool result", {
+    tool: "get_current_code_context",
+    available: output.available,
+    problemSlug: output.problemSlug,
+    language: output.language,
+    hasCode: Boolean(output.code),
+    code: output.code
+  });
+
+  if (output.code !== null) {
+    console.log("[loop] Realtime tool code", output.code);
+  }
+};
+
 export const installBackgroundMessageHandlers = ({
   runtime = chrome.runtime,
   sendPageMessage = (tabId, message) =>
@@ -84,8 +107,15 @@ export const installBackgroundMessageHandlers = ({
   // from background instead of depending on page-local React/content-script state.
   runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message?.type === GET_LATEST_CODE_SNAPSHOT_MESSAGE_TYPE) {
+      const snapshot = getLatestCodeSnapshot();
+      logRealtimeToolCall(snapshot);
+      logRealtimeToolResult(
+        snapshot
+          ? buildCurrentCodeContextToolOutput(snapshot)
+          : buildEmptyCurrentCodeContextToolOutput()
+      );
       (sendResponse as MessageResponder)({
-        snapshot: getLatestCodeSnapshot()
+        snapshot
       } satisfies CaptureLatestCodeSnapshotResponse);
       return false;
     }

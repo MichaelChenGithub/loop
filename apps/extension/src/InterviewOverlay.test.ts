@@ -121,6 +121,9 @@ describe("startInterviewSessionAttempt", () => {
     expect(fetchClientSecret).toHaveBeenCalledTimes(1);
     expect(session.start).toHaveBeenCalledTimes(1);
     expect(result.remainingSeconds).toBe(100_000_000);
+  });
+});
+
 describe("LauncherButton", () => {
   it("renders the icon-based launcher content instead of the legacy L glyph", () => {
     const html = renderToStaticMarkup(

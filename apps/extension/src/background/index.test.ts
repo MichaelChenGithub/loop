@@ -92,6 +92,7 @@ describe("hasMeaningfulSnapshotChange", () => {
 describe("installBackgroundMessageHandlers", () => {
   beforeEach(() => {
     clearLatestCodeSnapshot();
+    vi.restoreAllMocks();
   });
 
   it("requests a one-time page snapshot and stores it", async () => {
@@ -163,6 +164,7 @@ describe("installBackgroundMessageHandlers", () => {
     const addListener = vi.fn();
     const existingSnapshot = makeSnapshot("print('existing')");
     setLatestCodeSnapshot(existingSnapshot);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     installBackgroundMessageHandlers({
       runtime: {
@@ -183,11 +185,30 @@ describe("installBackgroundMessageHandlers", () => {
     expect(sendResponse).toHaveBeenCalledWith({
       snapshot: existingSnapshot
     });
+    expect(logSpy).toHaveBeenNthCalledWith(1, "[loop] Realtime tool call", {
+      tool: "get_current_code_context",
+      available: true,
+      problemSlug: "two-sum"
+    });
+    expect(logSpy).toHaveBeenNthCalledWith(2, "[loop] Realtime tool result", {
+      tool: "get_current_code_context",
+      available: true,
+      problemSlug: "two-sum",
+      language: "python3",
+      hasCode: true,
+      code: "print('existing')"
+    });
+    expect(logSpy).toHaveBeenNthCalledWith(
+      3,
+      "[loop] Realtime tool code",
+      "print('existing')"
+    );
   });
 
   it("returns null through the read-only background message when no snapshot exists", () => {
     const addListener = vi.fn();
     const sendPageMessage = vi.fn();
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     installBackgroundMessageHandlers({
       runtime: {
@@ -210,6 +231,20 @@ describe("installBackgroundMessageHandlers", () => {
       snapshot: null
     });
     expect(sendPageMessage).not.toHaveBeenCalled();
+    expect(logSpy).toHaveBeenNthCalledWith(1, "[loop] Realtime tool call", {
+      tool: "get_current_code_context",
+      available: false,
+      problemSlug: null
+    });
+    expect(logSpy).toHaveBeenNthCalledWith(2, "[loop] Realtime tool result", {
+      tool: "get_current_code_context",
+      available: false,
+      problemSlug: null,
+      language: null,
+      hasCode: false,
+      code: null
+    });
+    expect(logSpy).toHaveBeenCalledTimes(2);
   });
 });
 
