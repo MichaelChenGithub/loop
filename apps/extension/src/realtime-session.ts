@@ -1,3 +1,5 @@
+import type { ProblemPayloadForBackend } from "./leetcode-page";
+
 const OPENAI_REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
 
 const readRealtimeError = async (response: Response): Promise<string> => {
@@ -109,10 +111,15 @@ export type ClientSecretResponse = {
 };
 
 export async function fetchClientSecret(
-  apiBaseUrl: string
+  apiBaseUrl: string,
+  payload: ProblemPayloadForBackend
 ): Promise<ClientSecretResponse> {
   const response = await fetch(`${apiBaseUrl}/v1/realtime/sessions`, {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {

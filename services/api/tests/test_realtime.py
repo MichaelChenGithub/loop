@@ -2,6 +2,20 @@ from __future__ import annotations
 
 import httpx
 from app.core.realtime import RealtimeClientSecretBroker
+from app.models.realtime import RealtimeSessionRequest
+
+VALID_REQUEST = RealtimeSessionRequest.model_validate(
+    {
+        "problem": {
+            "slug": "two-sum",
+            "title": "Two Sum",
+            "difficulty": "Easy",
+            "description": "Given an array of integers nums and an integer target.",
+            "examples": [{"input": "nums = [2,7], target = 9", "output": "[0,1]"}],
+            "constraints": ["2 <= nums.length <= 10^4"],
+        }
+    }
+)
 
 
 def _make_broker(
@@ -44,7 +58,7 @@ def _make_broker(
 def test_broker_posts_backend_owned_defaults_to_openai() -> None:
     broker, captured = _make_broker(max_interview_seconds=600)
 
-    result = broker.create()
+    result = broker.create(VALID_REQUEST)
 
     assert result["value"] == "ek_123"
     assert captured == {
@@ -63,8 +77,16 @@ def test_broker_posts_backend_owned_defaults_to_openai() -> None:
 def test_broker_uses_configured_max_interview_seconds() -> None:
     broker, captured = _make_broker(max_interview_seconds=1800)
 
-    broker.create()
+    broker.create(VALID_REQUEST)
 
     import json
     body = json.loads(captured["json"])
     assert body["expires_after"]["seconds"] == 1800
+
+
+def test_broker_accepts_problem_context_for_future_instruction_integration() -> None:
+    broker, _ = _make_broker(max_interview_seconds=600)
+
+    result = broker.create(VALID_REQUEST)
+
+    assert result["value"] == "ek_123"

@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.realtime import RealtimeClientSecretBroker
 from app.core.settings import get_settings
-from app.models.realtime import RealtimeClientSecretResponse
+from app.models.realtime import RealtimeClientSecretResponse, RealtimeSessionRequest
 
 
 def _sanitize_client_secret(payload: dict[str, Any]) -> RealtimeClientSecretResponse:
@@ -28,7 +28,7 @@ def _sanitize_client_secret(payload: dict[str, Any]) -> RealtimeClientSecretResp
     )
 
 
-def _default_session_creator() -> dict[str, Any]:
+def _default_session_creator(request: RealtimeSessionRequest) -> dict[str, Any]:
     settings = get_settings()
     if not settings.openai_api_key:
         raise HTTPException(status_code=500, detail="Realtime broker is not configured")
@@ -41,7 +41,7 @@ def _default_session_creator() -> dict[str, Any]:
         max_interview_seconds=settings.max_interview_seconds,
     )
     try:
-        return broker.create()
+        return broker.create(request)
     except httpx.HTTPStatusError as exc:
         body = exc.response.text
         raise HTTPException(status_code=502, detail=f"OpenAI error {exc.response.status_code}: {body}") from exc
@@ -51,7 +51,7 @@ def _default_session_creator() -> dict[str, Any]:
 
 def create_app(
     *,
-    create_session: Callable[[], dict[str, Any]] | None = None,
+    create_session: Callable[[RealtimeSessionRequest], dict[str, Any]] | None = None,
 ) -> FastAPI:
     app = FastAPI(title="loop api")
 
@@ -68,9 +68,9 @@ def create_app(
         return {"status": "ok"}
 
     @app.post("/v1/realtime/sessions", response_model=RealtimeClientSecretResponse)
-    def create_realtime_session() -> RealtimeClientSecretResponse:
+    def create_realtime_session(request: RealtimeSessionRequest) -> RealtimeClientSecretResponse:
         try:
-            payload = session_creator()
+            payload = session_creator(request)
         except HTTPException:
             raise
         except Exception as exc:
