@@ -1,5 +1,6 @@
 import {
   startTransition,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -8,6 +9,7 @@ import {
 } from "react";
 
 import { computePopoverPlacement } from "./popover-placement";
+import { fetchClientSecret, RealtimeSession } from "./realtime-session";
 import {
   TOOLBAR_BUTTON_SIZE,
   resolveToolbarAnchor,
@@ -15,26 +17,32 @@ import {
 } from "./toolbar-anchor";
 import {
   closePanel as closeShellPanel,
+  confirmConnected,
   createInitialInterviewShellState,
   endSession,
-  openPanel as openShellPanel,
-  pauseSession,
+  sessionFailed,
   startSession,
   tickTimer,
   toggleMute,
   type InterviewShellState
 } from "./state";
+import { INITIAL_OVERLAY_SYNC_DELAYS_MS } from "./overlay-bootstrap";
+import { shouldMountInterviewOverlay } from "./overlay-visibility";
 
 const PANEL_WIDTH = 336;
-const PANEL_ESTIMATED_HEIGHT = 292;
+const PANEL_ESTIMATED_HEIGHT = 260;
+
+const API_BASE_URL =
+  process.env.PLASMO_PUBLIC_API_HOST ?? "http://localhost:8000";
 
 type PageTone = "dark" | "light";
 
-const formatElapsedTime = (elapsedSeconds: number): string => {
-  const minutes = Math.floor(elapsedSeconds / 60)
+const formatTime = (totalSeconds: number): string => {
+  const clamped = Math.max(0, totalSeconds);
+  const minutes = Math.floor(clamped / 60)
     .toString()
     .padStart(2, "0");
-  const seconds = (elapsedSeconds % 60).toString().padStart(2, "0");
+  const seconds = (clamped % 60).toString().padStart(2, "0");
 
   return `${minutes}:${seconds}`;
 };
@@ -45,8 +53,6 @@ const getConnectionLabel = (status: InterviewShellState["sessionStatus"]) => {
       return "Connected";
     case "connecting":
       return "Connecting";
-    case "paused":
-      return "Paused";
     case "ended":
       return "Ended";
     case "idle":
@@ -62,8 +68,6 @@ const getStatusTone = (
   switch (status) {
     case "connected":
       return pageTone === "dark" ? "#5ee3a1" : "#1d7a57";
-    case "paused":
-      return "#dba11c";
     case "ended":
       return "#e05c7b";
     case "connecting":
@@ -103,6 +107,9 @@ const sameAnchor = (left: ToolbarAnchorResult, right: ToolbarAnchorResult) =>
   left.buttonRect.height === right.buttonRect.height;
 
 export const InterviewOverlay = () => {
+  const [isVisible, setIsVisible] = useState(() =>
+    shouldMountInterviewOverlay(new URL(window.location.href), document)
+  );
   const [state, setState] = useState(createInitialInterviewShellState);
   const [anchor, setAnchor] = useState<ToolbarAnchorResult>(() =>
     resolveToolbarAnchor(document, getViewport())
@@ -120,7 +127,54 @@ export const InterviewOverlay = () => {
   );
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const popoverRef = useRef<HTMLDivElement | null>(null);
+  const sessionRef = useRef<RealtimeSession | null>(null);
 
+  // Show/hide based on URL and toolbar presence (replaces content-script syncOverlay)
+  useEffect(() => {
+    let rafId = 0;
+
+    const check = () => {
+      if (rafId) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = 0;
+        setIsVisible(
+          shouldMountInterviewOverlay(new URL(window.location.href), document)
+        );
+      });
+    };
+
+    const observer = new MutationObserver(check);
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+
+    window.addEventListener("popstate", check);
+    window.addEventListener("hashchange", check);
+
+    const originalPushState = history.pushState;
+    const originalReplaceState = history.replaceState;
+    history.pushState = function pushState(...args) {
+      originalPushState.apply(this, args);
+      check();
+    };
+    history.replaceState = function replaceState(...args) {
+      originalReplaceState.apply(this, args);
+      check();
+    };
+
+    INITIAL_OVERLAY_SYNC_DELAYS_MS.forEach((delay) => {
+      window.setTimeout(check, delay);
+    });
+
+    return () => {
+      if (rafId) window.cancelAnimationFrame(rafId);
+      observer.disconnect();
+      window.removeEventListener("popstate", check);
+      window.removeEventListener("hashchange", check);
+      history.pushState = originalPushState;
+      history.replaceState = originalReplaceState;
+    };
+  }, []);
+
+  // Tick countdown while connected
   useEffect(() => {
     if (state.sessionStatus !== "connected") {
       return undefined;
@@ -133,6 +187,14 @@ export const InterviewOverlay = () => {
     return () => {
       window.clearInterval(intervalId);
     };
+  }, [state.sessionStatus]);
+
+  // Clean up WebRTC when session ends (including auto-expiry)
+  useEffect(() => {
+    if (state.sessionStatus === "ended") {
+      sessionRef.current?.end();
+      sessionRef.current = null;
+    }
   }, [state.sessionStatus]);
 
   useEffect(() => {
@@ -231,9 +293,53 @@ export const InterviewOverlay = () => {
     setState((currentState) =>
       currentState.isPanelOpen
         ? closeShellPanel(currentState)
-        : openShellPanel(currentState)
+        : { ...currentState, isPanelOpen: true }
     );
   };
+
+  const handleStart = useCallback(() => {
+    setState((currentState) => {
+      if (
+        currentState.sessionStatus === "connecting" ||
+        currentState.sessionStatus === "connected"
+      ) {
+        return currentState;
+      }
+
+      return startSession(currentState);
+    });
+
+    void (async () => {
+      try {
+        const secret = await fetchClientSecret(API_BASE_URL);
+        const session = new RealtimeSession();
+        sessionRef.current = session;
+        await session.start(secret.value, secret.session.model);
+        const remainingSeconds =
+          secret.expires_at - Math.floor(Date.now() / 1000);
+        setState((currentState) =>
+          confirmConnected(currentState, remainingSeconds)
+        );
+      } catch {
+        sessionRef.current = null;
+        setState((currentState) => sessionFailed(currentState));
+      }
+    })();
+  }, []);
+
+  const handleEnd = useCallback(() => {
+    sessionRef.current?.end();
+    sessionRef.current = null;
+    setState((currentState) => endSession(currentState));
+  }, []);
+
+  const handleMuteToggle = useCallback(() => {
+    setState((currentState) => {
+      const next = toggleMute(currentState);
+      sessionRef.current?.setMuted(next.isMuted);
+      return next;
+    });
+  }, []);
 
   const palette =
     pageTone === "dark"
@@ -269,6 +375,14 @@ export const InterviewOverlay = () => {
           secondaryBackground: "rgba(248, 250, 252, 0.92)",
           secondaryBorder: "rgba(148, 163, 184, 0.45)"
         };
+
+  const isStartDisabled =
+    state.sessionStatus === "connecting" ||
+    state.sessionStatus === "connected";
+
+  if (!isVisible) {
+    return null;
+  }
 
   return (
     <div style={styles.host}>
@@ -348,32 +462,26 @@ export const InterviewOverlay = () => {
               ...styles.timerCard,
               background: palette.timerBackground
             }}>
-            <span style={styles.timerLabel}>Interview timer</span>
+            <span style={styles.timerLabel}>Time remaining</span>
             <strong style={styles.timerValue}>
-              {formatElapsedTime(state.elapsedSeconds)}
+              {formatTime(state.remainingSeconds)}
             </strong>
           </div>
 
           <div style={styles.primaryControls}>
             <button
-              onClick={() => setState((currentState) => startSession(currentState))}
-              style={styles.primaryButton}
-              type="button">
-              Start
-            </button>
-            <button
-              onClick={() => setState((currentState) => pauseSession(currentState))}
+              disabled={isStartDisabled}
+              onClick={handleStart}
               style={{
-                ...styles.secondaryButton,
-                background: palette.secondaryBackground,
-                borderColor: palette.secondaryBorder,
-                color: palette.panelText
+                ...styles.primaryButton,
+                opacity: isStartDisabled ? 0.5 : 1,
+                cursor: isStartDisabled ? "default" : "pointer"
               }}
               type="button">
-              Pause
+              {state.sessionStatus === "connecting" ? "Connecting…" : "Start"}
             </button>
             <button
-              onClick={() => setState((currentState) => endSession(currentState))}
+              onClick={handleEnd}
               style={{
                 ...styles.secondaryButton,
                 background: palette.secondaryBackground,
@@ -387,7 +495,7 @@ export const InterviewOverlay = () => {
 
           <div style={styles.footerRow}>
             <button
-              onClick={() => setState((currentState) => toggleMute(currentState))}
+              onClick={handleMuteToggle}
               style={{
                 ...styles.utilityButton,
                 background: palette.utilityBackground,
@@ -520,7 +628,7 @@ const styles: Record<string, CSSProperties> = {
   },
   primaryControls: {
     display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
     gap: "10px",
     marginTop: "14px"
   },
@@ -530,8 +638,7 @@ const styles: Record<string, CSSProperties> = {
     backgroundColor: "#0f766e",
     color: "#f8fafc",
     padding: "13px 10px",
-    fontWeight: 700,
-    cursor: "pointer"
+    fontWeight: 700
   },
   secondaryButton: {
     borderRadius: "14px",

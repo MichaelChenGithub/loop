@@ -2,7 +2,6 @@ export const SESSION_STATUSES = [
   "idle",
   "connecting",
   "connected",
-  "paused",
   "ended"
 ] as const;
 
@@ -12,14 +11,14 @@ export type InterviewShellState = {
   isPanelOpen: boolean;
   isMuted: boolean;
   sessionStatus: SessionStatus;
-  elapsedSeconds: number;
+  remainingSeconds: number;
 };
 
 export const createInitialInterviewShellState = (): InterviewShellState => ({
   isPanelOpen: false,
   isMuted: false,
   sessionStatus: "idle",
-  elapsedSeconds: 0
+  remainingSeconds: 0
 });
 
 export const openPanel = (
@@ -43,18 +42,31 @@ export const toggleMute = (
   isMuted: !state.isMuted
 });
 
+// Transition: idle/ended → connecting (user pressed Start)
 export const startSession = (
   state: InterviewShellState
 ): InterviewShellState => ({
   ...state,
-  sessionStatus: "connected"
+  sessionStatus: "connecting"
 });
 
-export const pauseSession = (
+// Transition: connecting → connected (WebRTC handshake succeeded)
+export const confirmConnected = (
+  state: InterviewShellState,
+  remainingSeconds: number
+): InterviewShellState => ({
+  ...state,
+  sessionStatus: "connected",
+  remainingSeconds
+});
+
+// Transition: any → idle (connection failed)
+export const sessionFailed = (
   state: InterviewShellState
 ): InterviewShellState => ({
   ...state,
-  sessionStatus: "paused"
+  sessionStatus: "idle",
+  remainingSeconds: 0
 });
 
 export const endSession = (
@@ -62,7 +74,7 @@ export const endSession = (
 ): InterviewShellState => ({
   ...state,
   sessionStatus: "ended",
-  elapsedSeconds: 0
+  remainingSeconds: 0
 });
 
 export const tickTimer = (
@@ -72,8 +84,11 @@ export const tickTimer = (
     return state;
   }
 
-  return {
-    ...state,
-    elapsedSeconds: state.elapsedSeconds + 1
-  };
+  const next = state.remainingSeconds - 1;
+
+  if (next <= 0) {
+    return { ...state, sessionStatus: "ended", remainingSeconds: 0 };
+  }
+
+  return { ...state, remainingSeconds: next };
 };

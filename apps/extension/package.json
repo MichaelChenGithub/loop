@@ -15,6 +15,9 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
+  "manifest": {
+    "host_permissions": ["http://localhost:8000/*"]
+  },
   "devDependencies": {
     "@playwright/test": "^1.52.0",
     "@types/chrome": "^0.1.29",
