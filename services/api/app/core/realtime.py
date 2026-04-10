@@ -13,17 +13,19 @@ class RealtimeClientSecretBroker:
         model: str,
         voice: str,
         instructions: str,
+        max_interview_seconds: int = 600,
         http_client: httpx.Client | None = None,
     ) -> None:
         self._api_key = api_key
         self._model = model
         self._voice = voice
         self._instructions = instructions
+        self._max_interview_seconds = max_interview_seconds
         self._http_client = http_client
 
     def create(self) -> dict[str, Any]:
         payload = {
-            "expires_after": {"anchor": "created_at", "seconds": 600},
+            "expires_after": {"anchor": "created_at", "seconds": self._max_interview_seconds},
             "session": {
                 "type": "realtime",
                 "model": self._model,

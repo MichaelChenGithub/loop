@@ -4,8 +4,10 @@ import httpx
 from app.core.realtime import RealtimeClientSecretBroker
 
 
-def test_broker_posts_backend_owned_defaults_to_openai() -> None:
-    captured = {}
+def _make_broker(
+    max_interview_seconds: int = 600,
+) -> tuple[RealtimeClientSecretBroker, dict]:
+    captured: dict = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
         captured["method"] = request.method
@@ -33,8 +35,14 @@ def test_broker_posts_backend_owned_defaults_to_openai() -> None:
         model="gpt-realtime-2025-08-25",
         voice="alloy",
         instructions="You are Loop, a voice interviewer.",
+        max_interview_seconds=max_interview_seconds,
         http_client=http_client,
     )
+    return broker, captured
+
+
+def test_broker_posts_backend_owned_defaults_to_openai() -> None:
+    broker, captured = _make_broker(max_interview_seconds=600)
 
     result = broker.create()
 
@@ -50,3 +58,13 @@ def test_broker_posts_backend_owned_defaults_to_openai() -> None:
             '{"output":{"voice":"alloy"}}}}'
         ),
     }
+
+
+def test_broker_uses_configured_max_interview_seconds() -> None:
+    broker, captured = _make_broker(max_interview_seconds=1800)
+
+    broker.create()
+
+    import json
+    body = json.loads(captured["json"])
+    assert body["expires_after"]["seconds"] == 1800

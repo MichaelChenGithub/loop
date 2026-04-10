@@ -14,6 +14,7 @@ class Settings:
     openai_realtime_model: str
     openai_realtime_voice: str
     openai_realtime_instructions: str
+    max_interview_seconds: int
 
 
 def get_settings() -> Settings:
@@ -25,4 +26,5 @@ def get_settings() -> Settings:
             "OPENAI_REALTIME_INSTRUCTIONS",
             DEFAULT_REALTIME_INSTRUCTIONS,
         ),
+        max_interview_seconds=int(os.getenv("MAX_INTERVIEW_SECONDS", "600")),
     )
