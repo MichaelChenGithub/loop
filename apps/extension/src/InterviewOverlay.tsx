@@ -8,6 +8,7 @@ import {
   type CSSProperties
 } from "react";
 
+import { AppIcon } from "./AppIcon";
 import {
   buildProblemPayloadForBackend,
   extractLeetCodeProblem,
@@ -155,6 +156,34 @@ export const resolvePanelAnchorRect = (
   baseControlRect: RectLike | null,
   fallbackRect: RectLike
 ): RectLike => baseControlRect ?? fallbackRect;
+
+export const LauncherButton = ({
+  isExpanded,
+  onClick,
+  palette
+}: {
+  isExpanded: boolean;
+  onClick: () => void;
+  palette: {
+    buttonBackground: string;
+    buttonBorder: string;
+    buttonText: string;
+  };
+}) => (
+  <button
+    aria-expanded={isExpanded}
+    aria-label="Open Loop interviewer"
+    onClick={onClick}
+    style={{
+      ...styles.toolbarButton,
+      background: palette.buttonBackground,
+      borderColor: palette.buttonBorder,
+      color: palette.buttonText
+    }}
+    type="button">
+    <AppIcon decorative size={22} />
+  </button>
+);
 
 export const InterviewOverlay = () => {
   const [isVisible, setIsVisible] = useState(() =>
@@ -493,19 +522,11 @@ export const InterviewOverlay = () => {
         }}
         style={getAnchorWrapperStyle(anchor.buttonRect, viewportWidth)}>
         {state.baseControlMode === "launcher" ? (
-          <button
-            aria-expanded={state.isPanelExpanded}
-            aria-label="Open Loop interviewer"
+          <LauncherButton
+            isExpanded={state.isPanelExpanded}
             onClick={openPanel}
-            style={{
-              ...styles.toolbarButton,
-              background: paletteWithButton.buttonBackground,
-              borderColor: paletteWithButton.buttonBorder,
-              color: paletteWithButton.buttonText
-            }}
-            type="button">
-            <span style={styles.buttonCore}>L</span>
-          </button>
+            palette={paletteWithButton}
+          />
         ) : (
           <CollapsedToolbar
             onEnd={handleEnd}
@@ -568,10 +589,5 @@ const styles: Record<string, CSSProperties> = {
     placeItems: "center",
     cursor: "pointer",
     padding: 0
-  },
-  buttonCore: {
-    fontSize: "14px",
-    fontWeight: 700,
-    lineHeight: 1
   }
 };
