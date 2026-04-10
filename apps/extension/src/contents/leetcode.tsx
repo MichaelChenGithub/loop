@@ -6,6 +6,7 @@ import {
   INITIAL_OVERLAY_SYNC_DELAYS_MS,
   needsOverlayBootstrapRetry
 } from "../overlay-bootstrap";
+import { LOOP_NAVIGATE_EVENT } from "../leetcode-page";
 import { shouldMountInterviewOverlay } from "../overlay-visibility";
 
 const HOST_ID = "loop-interviewer-host";
@@ -141,11 +142,13 @@ const startOverlayLifecycle = () => {
 
   history.pushState = function pushState(...args) {
     originalPushState.apply(this, args);
+    window.dispatchEvent(new CustomEvent(LOOP_NAVIGATE_EVENT));
     syncOverlay();
   };
 
   history.replaceState = function replaceState(...args) {
     originalReplaceState.apply(this, args);
+    window.dispatchEvent(new CustomEvent(LOOP_NAVIGATE_EVENT));
     syncOverlay();
   };
 };
