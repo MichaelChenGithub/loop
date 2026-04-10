@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   CAPTURE_LATEST_CODE_SNAPSHOT_MESSAGE_TYPE,
+  GET_LATEST_CODE_SNAPSHOT_MESSAGE_TYPE,
   READ_LATEST_CODE_SNAPSHOT_FROM_PAGE_MESSAGE_TYPE,
   type LatestCodeSnapshot
 } from "../code-snapshot";
@@ -157,6 +158,59 @@ describe("installBackgroundMessageHandlers", () => {
     expect(keepChannelOpen).toBe(true);
     expect(getLatestCodeSnapshot()).toEqual(existingSnapshot);
   });
+
+  it("returns the stored snapshot through the read-only background message", () => {
+    const addListener = vi.fn();
+    const existingSnapshot = makeSnapshot("print('existing')");
+    setLatestCodeSnapshot(existingSnapshot);
+
+    installBackgroundMessageHandlers({
+      runtime: {
+        onMessage: { addListener }
+      } as never
+    });
+
+    const listener = addListener.mock.calls[0]?.[0];
+    const sendResponse = vi.fn();
+
+    const keepChannelOpen = listener(
+      { type: GET_LATEST_CODE_SNAPSHOT_MESSAGE_TYPE },
+      { tab: { id: 12 } },
+      sendResponse
+    );
+
+    expect(keepChannelOpen).toBe(false);
+    expect(sendResponse).toHaveBeenCalledWith({
+      snapshot: existingSnapshot
+    });
+  });
+
+  it("returns null through the read-only background message when no snapshot exists", () => {
+    const addListener = vi.fn();
+    const sendPageMessage = vi.fn();
+
+    installBackgroundMessageHandlers({
+      runtime: {
+        onMessage: { addListener }
+      } as never,
+      sendPageMessage
+    });
+
+    const listener = addListener.mock.calls[0]?.[0];
+    const sendResponse = vi.fn();
+
+    const keepChannelOpen = listener(
+      { type: GET_LATEST_CODE_SNAPSHOT_MESSAGE_TYPE },
+      { tab: { id: 12 } },
+      sendResponse
+    );
+
+    expect(keepChannelOpen).toBe(false);
+    expect(sendResponse).toHaveBeenCalledWith({
+      snapshot: null
+    });
+    expect(sendPageMessage).not.toHaveBeenCalled();
+  });
 });
 
 describe("buildCurrentCodeContextToolOutput", () => {
@@ -164,6 +218,7 @@ describe("buildCurrentCodeContextToolOutput", () => {
     expect(
       buildCurrentCodeContextToolOutput(makeSnapshot("print('captured')"))
     ).toEqual({
+      available: true,
       code: "print('captured')",
       language: "python3",
       problemSlug: "two-sum",
@@ -182,6 +237,7 @@ describe("buildCurrentCodeContextToolOutput", () => {
         problemSlug: null
       })
     ).toEqual({
+      available: true,
       code: "return [];",
       language: null,
       problemSlug: null,
