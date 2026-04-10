@@ -14,6 +14,8 @@ import {
   LOOP_NAVIGATE_EVENT,
   type LeetCodeProblem
 } from "./leetcode-page";
+import { captureLatestCodeSnapshot } from "./code-snapshot-runtime";
+import { shouldShowCodeCaptureDebugAction } from "./debug-controls";
 import { computePopoverPlacement } from "./popover-placement";
 import { fetchClientSecret, RealtimeSession } from "./realtime-session";
 import {
@@ -346,6 +348,7 @@ export const InterviewOverlay = () => {
 
     void (async () => {
       try {
+        await captureLatestCodeSnapshot().catch(() => ({ snapshot: null }));
         const secret = await fetchClientSecret(API_BASE_URL);
         const session = new RealtimeSession();
         sessionRef.current = session;
@@ -374,6 +377,10 @@ export const InterviewOverlay = () => {
       sessionRef.current?.setMuted(next.isMuted);
       return next;
     });
+  }, []);
+
+  const handleCaptureCode = useCallback(() => {
+    void captureLatestCodeSnapshot().catch(() => ({ snapshot: null }));
   }, []);
 
   const palette =
@@ -414,6 +421,7 @@ export const InterviewOverlay = () => {
   const isStartDisabled =
     state.sessionStatus === "connecting" ||
     state.sessionStatus === "connected";
+  const showCodeCaptureDebugAction = shouldShowCodeCaptureDebugAction();
 
   if (!isVisible) {
     return null;
@@ -560,6 +568,22 @@ export const InterviewOverlay = () => {
               outside click closes
             </span>
           </div>
+
+          {showCodeCaptureDebugAction ? (
+            <div style={styles.debugRow}>
+              <button
+                onClick={handleCaptureCode}
+                style={{
+                  ...styles.debugButton,
+                  background: palette.secondaryBackground,
+                  borderColor: palette.secondaryBorder,
+                  color: palette.panelText
+                }}
+                type="button">
+                Capture code
+              </button>
+            </div>
+          ) : null}
         </section>
       ) : null}
     </div>
@@ -717,6 +741,19 @@ const styles: Record<string, CSSProperties> = {
   hintText: {
     fontSize: "12px",
     textAlign: "right"
+  },
+  debugRow: {
+    display: "flex",
+    justifyContent: "flex-end",
+    marginTop: "12px"
+  },
+  debugButton: {
+    borderRadius: "12px",
+    border: "1px solid",
+    padding: "10px 12px",
+    fontSize: "12px",
+    fontWeight: 700,
+    cursor: "pointer"
   },
   problemCard: {
     display: "flex",
