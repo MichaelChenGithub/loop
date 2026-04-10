@@ -1,0 +1,10 @@
+{
+  "name": "loop",
+  "private": true,
+  "packageManager": "pnpm@10.8.1",
+  "scripts": {
+    "dev:extension": "pnpm --dir apps/extension dev",
+    "build:extension": "pnpm --dir apps/extension build",
+    "typecheck": "pnpm --filter @loop/shared typecheck && pnpm --dir apps/extension typecheck"
+  }
+}
