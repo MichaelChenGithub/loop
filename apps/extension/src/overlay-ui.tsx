@@ -1,5 +1,6 @@
 import { forwardRef, type CSSProperties } from "react";
 
+import { AppIcon } from "./AppIcon";
 import type { LeetCodeProblem } from "./leetcode-page";
 import type { InterviewShellState } from "./state";
 
@@ -235,9 +236,12 @@ export const ExpandedPanel = forwardRef<
       color: palette.panelText
     }}>
     <div style={styles.headerRow}>
-      <div>
-        <p style={{ ...styles.eyebrow, color: palette.subtleText }}>Loop</p>
-        <h2 style={styles.title}>Interviewer</h2>
+      <div style={styles.brandBlock}>
+        <AppIcon decorative size={40} style={styles.brandIcon} />
+        <div>
+          <p style={{ ...styles.eyebrow, color: palette.subtleText }}>Loop</p>
+          <h2 style={styles.title}>Interviewer</h2>
+        </div>
       </div>
       <button
         aria-label="Close interviewer panel"
@@ -429,6 +433,15 @@ const styles: Record<string, CSSProperties> = {
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: "16px"
+  },
+  brandBlock: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    minWidth: 0
+  },
+  brandIcon: {
+    borderRadius: "10px"
   },
   eyebrow: {
     margin: 0,

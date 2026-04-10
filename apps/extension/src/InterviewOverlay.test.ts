@@ -1,7 +1,10 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import {
   getAnchorWrapperStyle,
+  LauncherButton,
   resolvePanelAnchorRect,
   resolvePageTone
 } from "./InterviewOverlay";
@@ -52,5 +55,25 @@ describe("resolvePanelAnchorRect", () => {
       width: 180,
       right: 1180
     });
+  });
+});
+
+describe("LauncherButton", () => {
+  it("renders the icon-based launcher content instead of the legacy L glyph", () => {
+    const html = renderToStaticMarkup(
+      createElement(LauncherButton, {
+        isExpanded: false,
+        onClick: () => undefined,
+        palette: {
+          buttonBackground: "#020617",
+          buttonBorder: "#334155",
+          buttonText: "#e2e8f0"
+        }
+      })
+    );
+
+    expect(html).toContain("aria-label=\"Open Loop interviewer\"");
+    expect(html).toContain("data-app-icon=\"true\"");
+    expect(html).not.toContain(">L<");
   });
 });
