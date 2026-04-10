@@ -208,6 +208,8 @@ __marimo__/
 
 # Node / frontend
 node_modules/
+.plasmo/
+*.tsbuildinfo
 .pnpm-store/
 pnpm-lock.yaml
 dist/
@@ -215,6 +217,8 @@ build/
 .parcel-cache/
 .turbo/
 coverage/
+playwright-report/
+test-results/
 
 # Chrome extension artifacts
 *.crx

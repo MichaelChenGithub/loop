@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="loopGradient" x1="14" y1="14" x2="114" y2="114" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0f766e" />
+      <stop offset="1" stop-color="#0c4a6e" />
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="28" fill="url(#loopGradient)" />
+  <path
+    d="M42 39c-9.389 0-17 7.611-17 17v16c0 9.389 7.611 17 17 17h14c9.389 0 17-7.611 17-17V56c0-9.389-7.611-17-17-17H42Zm0 12h14c2.761 0 5 2.239 5 5v16c0 2.761-2.239 5-5 5H42c-2.761 0-5-2.239-5-5V56c0-2.761 2.239-5 5-5Z"
+    fill="#f8fafc" />
+  <path
+    d="M79 50c13.807 0 25 11.193 25 25 0 13.807-11.193 25-25 25h-5V88h5c7.18 0 13-5.82 13-13 0-7.18-5.82-13-13-13h-5V50h5Z"
+    fill="#bae6fd" />
+</svg>
