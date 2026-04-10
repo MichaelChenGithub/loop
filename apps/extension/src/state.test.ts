@@ -2,10 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   closePanel,
+  confirmConnected,
   createInitialInterviewShellState,
   endSession,
   openPanel,
-  pauseSession,
+  sessionFailed,
   startSession,
   tickTimer,
   toggleMute
@@ -17,7 +18,7 @@ describe("interview shell state", () => {
       isPanelOpen: false,
       isMuted: false,
       sessionStatus: "idle",
-      elapsedSeconds: 0
+      remainingSeconds: 0
     });
   });
 
@@ -37,24 +38,49 @@ describe("interview shell state", () => {
     expect(mutedState.sessionStatus).toBe("idle");
   });
 
-  it("tracks session lifecycle and resets the timer on end", () => {
-    const connectedState = startSession(createInitialInterviewShellState());
-    const runningState = tickTimer(tickTimer(connectedState));
-    const pausedState = pauseSession(runningState);
-    const endedState = endSession(pausedState);
+  it("tracks session lifecycle: connecting → connected → ended", () => {
+    const connectingState = startSession(createInitialInterviewShellState());
+    const connectedState = confirmConnected(connectingState, 120);
+    const endedState = endSession(connectedState);
 
+    expect(connectingState.sessionStatus).toBe("connecting");
     expect(connectedState.sessionStatus).toBe("connected");
-    expect(runningState.elapsedSeconds).toBe(2);
-    expect(pausedState.sessionStatus).toBe("paused");
-    expect(endedState).toMatchObject({
-      sessionStatus: "ended",
-      elapsedSeconds: 0
-    });
+    expect(connectedState.remainingSeconds).toBe(120);
+    expect(endedState).toMatchObject({ sessionStatus: "ended", remainingSeconds: 0 });
   });
 
-  it("does not increment the timer while not connected", () => {
-    const pausedState = pauseSession(startSession(createInitialInterviewShellState()));
+  it("resets to idle on session failure", () => {
+    const failedState = sessionFailed(startSession(createInitialInterviewShellState()));
 
-    expect(tickTimer(pausedState).elapsedSeconds).toBe(0);
+    expect(failedState.sessionStatus).toBe("idle");
+    expect(failedState.remainingSeconds).toBe(0);
+  });
+
+  it("counts down the timer each tick while connected", () => {
+    const connectedState = confirmConnected(
+      startSession(createInitialInterviewShellState()),
+      10
+    );
+    const afterTwoTicks = tickTimer(tickTimer(connectedState));
+
+    expect(afterTwoTicks.remainingSeconds).toBe(8);
+    expect(afterTwoTicks.sessionStatus).toBe("connected");
+  });
+
+  it("auto-ends the session when the timer reaches zero", () => {
+    const connectedState = confirmConnected(
+      startSession(createInitialInterviewShellState()),
+      1
+    );
+    const expiredState = tickTimer(connectedState);
+
+    expect(expiredState.sessionStatus).toBe("ended");
+    expect(expiredState.remainingSeconds).toBe(0);
+  });
+
+  it("does not decrement the timer while not connected", () => {
+    const idleState = createInitialInterviewShellState();
+
+    expect(tickTimer(idleState).remainingSeconds).toBe(0);
   });
 });
