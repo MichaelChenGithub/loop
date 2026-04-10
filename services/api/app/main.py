@@ -1,9 +1,75 @@
-from fastapi import FastAPI
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Any
+
+import httpx
+from fastapi import FastAPI, HTTPException
+
+from app.core.realtime import RealtimeClientSecretBroker
+from app.core.settings import get_settings
+from app.models.realtime import RealtimeClientSecretResponse
 
 
-app = FastAPI(title="loop api")
+def _sanitize_client_secret(payload: dict[str, Any]) -> RealtimeClientSecretResponse:
+    session = payload.get("session") or {}
+    return RealtimeClientSecretResponse.model_validate(
+        {
+            "value": payload["value"],
+            "expires_at": payload["expires_at"],
+            "session": {
+                "id": session["id"],
+                "model": session["model"],
+                "object": session["object"],
+                "type": session["type"],
+            },
+        }
+    )
 
 
-@app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+def _default_session_creator() -> dict[str, Any]:
+    settings = get_settings()
+    if not settings.openai_api_key:
+        raise HTTPException(status_code=500, detail="Realtime broker is not configured")
+
+    broker = RealtimeClientSecretBroker(
+        api_key=settings.openai_api_key,
+        model=settings.openai_realtime_model,
+        voice=settings.openai_realtime_voice,
+        instructions=settings.openai_realtime_instructions,
+    )
+    try:
+        return broker.create()
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail="Failed to create realtime session") from exc
+
+
+def create_app(
+    *,
+    create_session: Callable[[], dict[str, Any]] | None = None,
+) -> FastAPI:
+    app = FastAPI(title="loop api")
+
+    session_creator = create_session or _default_session_creator
+
+    @app.get("/health")
+    def health() -> dict[str, str]:
+        return {"status": "ok"}
+
+    @app.post("/v1/realtime/sessions", response_model=RealtimeClientSecretResponse)
+    def create_realtime_session() -> RealtimeClientSecretResponse:
+        try:
+            payload = session_creator()
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(
+                status_code=502,
+                detail="Failed to create realtime session",
+            ) from exc
+        return _sanitize_client_secret(payload)
+
+    return app
+
+
+app = create_app()
