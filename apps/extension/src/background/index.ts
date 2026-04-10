@@ -5,9 +5,18 @@ import {
   type LatestCodeSnapshot
 } from "../code-snapshot";
 
+export type CurrentCodeContextToolOutput = {
+  code: string;
+  language: string | null;
+  problemSlug: string | null;
+  capturedAt: string;
+  source: "leetcode-editor";
+};
+
 let latestCodeSnapshot: LatestCodeSnapshot | null = null;
 
 type RuntimeLike = Pick<typeof chrome.runtime, "onMessage">;
+type MessageResponder = (response: CaptureLatestCodeSnapshotResponse) => void;
 type SendPageMessage = (
   tabId: number,
   message: { type: typeof READ_LATEST_CODE_SNAPSHOT_FROM_PAGE_MESSAGE_TYPE }
@@ -27,6 +36,16 @@ export const clearLatestCodeSnapshot = (): void => {
   latestCodeSnapshot = null;
 };
 
+export const buildCurrentCodeContextToolOutput = (
+  snapshot: LatestCodeSnapshot
+): CurrentCodeContextToolOutput => ({
+  code: snapshot.code,
+  language: snapshot.language,
+  problemSlug: snapshot.problemSlug,
+  capturedAt: snapshot.updatedAt,
+  source: snapshot.source
+});
+
 export const installBackgroundMessageHandlers = ({
   runtime = chrome.runtime,
   sendPageMessage = (tabId, message) =>
@@ -37,7 +56,7 @@ export const installBackgroundMessageHandlers = ({
 } = {}): void => {
   // Keep the canonical snapshot here so future Realtime tool calling can read
   // from background instead of depending on page-local React/content-script state.
-  runtime.onMessage.addListener(async (message, sender) => {
+  runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message?.type !== CAPTURE_LATEST_CODE_SNAPSHOT_MESSAGE_TYPE) {
       return undefined;
     }
@@ -45,19 +64,26 @@ export const installBackgroundMessageHandlers = ({
     const tabId = sender.tab?.id;
 
     if (typeof tabId !== "number") {
-      return { snapshot: null } satisfies CaptureLatestCodeSnapshotResponse;
+      (sendResponse as MessageResponder)({
+        snapshot: null
+      } satisfies CaptureLatestCodeSnapshotResponse);
+      return false;
     }
 
-    const snapshot = await sendPageMessage(tabId, {
+    void sendPageMessage(tabId, {
       type: READ_LATEST_CODE_SNAPSHOT_FROM_PAGE_MESSAGE_TYPE
+    }).then((snapshot) => {
+      if (snapshot) {
+        setLatestCodeSnapshot(snapshot);
+        console.log("[loop] latest code snapshot", snapshot);
+      }
+
+      (sendResponse as MessageResponder)({
+        snapshot
+      } satisfies CaptureLatestCodeSnapshotResponse);
     });
 
-    if (snapshot) {
-      setLatestCodeSnapshot(snapshot);
-      console.log("[loop] latest code snapshot", snapshot);
-    }
-
-    return { snapshot } satisfies CaptureLatestCodeSnapshotResponse;
+    return true;
   });
 };
 

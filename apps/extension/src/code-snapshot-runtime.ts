@@ -9,6 +9,7 @@ import {
 } from "./leetcode-editor";
 
 type RuntimeLike = Pick<typeof chrome.runtime, "sendMessage" | "onMessage">;
+type MessageResponder = (response: unknown) => void;
 
 export const captureLatestCodeSnapshot = async ({
   runtime = chrome.runtime
@@ -35,7 +36,7 @@ export const installLatestCodeSnapshotPageReader = ({
   getLocationHref?: () => string;
   getNowIsoString?: () => string;
 } = {}): void => {
-  runtime.onMessage.addListener((message) => {
+  runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message?.type !== READ_LATEST_CODE_SNAPSHOT_FROM_PAGE_MESSAGE_TYPE) {
       return undefined;
     }
@@ -48,6 +49,7 @@ export const installLatestCodeSnapshotPageReader = ({
 
     console.log("[loop] page code snapshot", snapshot);
 
-    return snapshot;
+    (sendResponse as MessageResponder)(snapshot);
+    return true;
   });
 };
