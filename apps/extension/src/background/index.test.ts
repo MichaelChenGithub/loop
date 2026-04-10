@@ -6,6 +6,7 @@ import {
   type LatestCodeSnapshot
 } from "../code-snapshot";
 import {
+  buildCurrentCodeContextToolOutput,
   clearLatestCodeSnapshot,
   getLatestCodeSnapshot,
   installBackgroundMessageHandlers,
@@ -62,16 +63,24 @@ describe("installBackgroundMessageHandlers", () => {
     });
 
     const listener = addListener.mock.calls[0]?.[0];
+    const sendResponse = vi.fn();
 
-    const response = await listener(
+    const keepChannelOpen = listener(
       { type: CAPTURE_LATEST_CODE_SNAPSHOT_MESSAGE_TYPE },
-      { tab: { id: 12 } }
+      { tab: { id: 12 } },
+      sendResponse
     );
+
+    await vi.waitFor(() => {
+      expect(sendResponse).toHaveBeenCalledWith({
+        snapshot: makeSnapshot("print('captured')")
+      });
+    });
 
     expect(sendPageMessage).toHaveBeenCalledWith(12, {
       type: READ_LATEST_CODE_SNAPSHOT_FROM_PAGE_MESSAGE_TYPE
     });
-    expect(response).toEqual({ snapshot: makeSnapshot("print('captured')") });
+    expect(keepChannelOpen).toBe(true);
     expect(getLatestCodeSnapshot()).toEqual(makeSnapshot("print('captured')"));
   });
 
@@ -89,13 +98,51 @@ describe("installBackgroundMessageHandlers", () => {
     });
 
     const listener = addListener.mock.calls[0]?.[0];
+    const sendResponse = vi.fn();
 
-    const response = await listener(
+    const keepChannelOpen = listener(
       { type: CAPTURE_LATEST_CODE_SNAPSHOT_MESSAGE_TYPE },
-      { tab: { id: 12 } }
+      { tab: { id: 12 } },
+      sendResponse
     );
 
-    expect(response).toEqual({ snapshot: null });
+    await vi.waitFor(() => {
+      expect(sendResponse).toHaveBeenCalledWith({ snapshot: null });
+    });
+
+    expect(keepChannelOpen).toBe(true);
     expect(getLatestCodeSnapshot()).toEqual(existingSnapshot);
+  });
+});
+
+describe("buildCurrentCodeContextToolOutput", () => {
+  it("maps an internal snapshot to the thin tool payload", () => {
+    expect(
+      buildCurrentCodeContextToolOutput(makeSnapshot("print('captured')"))
+    ).toEqual({
+      code: "print('captured')",
+      language: "python3",
+      problemSlug: "two-sum",
+      capturedAt: "2026-04-10T15:30:00.000Z",
+      source: "leetcode-editor"
+    });
+  });
+
+  it("preserves nullable fields in the tool payload", () => {
+    expect(
+      buildCurrentCodeContextToolOutput({
+        language: null,
+        code: "return [];",
+        updatedAt: "2026-04-10T16:00:00.000Z",
+        source: "leetcode-editor",
+        problemSlug: null
+      })
+    ).toEqual({
+      code: "return [];",
+      language: null,
+      problemSlug: null,
+      capturedAt: "2026-04-10T16:00:00.000Z",
+      source: "leetcode-editor"
+    });
   });
 });

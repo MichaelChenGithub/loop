@@ -71,11 +71,17 @@ describe("installLatestCodeSnapshotPageReader", () => {
     });
 
     const listener = addListener.mock.calls[0]?.[0];
-    const response = await listener({
-      type: READ_LATEST_CODE_SNAPSHOT_FROM_PAGE_MESSAGE_TYPE
-    });
+    const sendResponse = vi.fn();
+    const keepChannelOpen = listener(
+      {
+        type: READ_LATEST_CODE_SNAPSHOT_FROM_PAGE_MESSAGE_TYPE
+      },
+      {},
+      sendResponse
+    );
 
-    expect(response).toEqual({
+    expect(keepChannelOpen).toBe(true);
+    expect(sendResponse).toHaveBeenCalledWith({
       language: "python3",
       code: "class Solution:\n    pass",
       updatedAt: "2026-04-10T15:30:00.000Z",
