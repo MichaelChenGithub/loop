@@ -73,6 +73,17 @@ def test_broker_posts_backend_owned_defaults_to_openai() -> None:
     assert body["session"]["type"] == "realtime"
     assert body["session"]["model"] == "gpt-realtime-2025-08-25"
     assert body["session"]["audio"] == {"output": {"voice": "alloy"}}
+    assert body["session"]["tools"] == [
+        {
+            "type": "function",
+            "name": "get_current_code_context",
+            "description": (
+                "Get the user's latest LeetCode codepad snapshot from the extension "
+                "background state."
+            ),
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        }
+    ]
     assert body["session"]["instructions"].startswith("You are Loop, a voice interviewer.")
     assert "\n---\n\n## Current Interview Problem\n" in body["session"]["instructions"]
     assert "Title: Two Sum" in body["session"]["instructions"]
@@ -118,3 +129,14 @@ def test_broker_prints_compiled_instructions_for_debugging() -> None:
     assert printed_output.startswith("[loop] Compiled realtime instructions:\n")
     assert "## Current Interview Problem" in printed_output
     assert "Title: Two Sum" in printed_output
+
+
+def test_broker_declares_current_code_context_tool_without_arguments() -> None:
+    broker, captured = _make_broker(max_interview_seconds=600)
+
+    broker.create(VALID_REQUEST)
+
+    tool = json.loads(captured["json"])["session"]["tools"][0]
+
+    assert tool["name"] == "get_current_code_context"
+    assert tool["parameters"] == {"type": "object", "properties": {}, "required": []}

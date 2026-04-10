@@ -8,6 +8,18 @@ from app.core.prompt_compiler import compile_realtime_instructions
 from app.models.realtime import RealtimeSessionRequest
 
 
+def build_current_code_context_tool() -> dict[str, Any]:
+    return {
+        "type": "function",
+        "name": "get_current_code_context",
+        "description": (
+            "Get the user's latest LeetCode codepad snapshot from the extension "
+            "background state."
+        ),
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    }
+
+
 class RealtimeClientSecretBroker:
     def __init__(
         self,
@@ -40,6 +52,7 @@ class RealtimeClientSecretBroker:
                         "voice": self._voice,
                     }
                 },
+                "tools": [build_current_code_context_tool()],
             },
         }
         headers = {
