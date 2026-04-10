@@ -17,18 +17,20 @@ import {
 } from "./leetcode-page";
 import { captureLatestCodeSnapshot } from "./code-snapshot-runtime";
 import { shouldShowCodeCaptureDebugAction } from "./debug-controls";
+import {
+  CollapsedToolbar,
+  ExpandedPanel,
+  type OverlayPalette,
+  type PageTone
+} from "./overlay-ui";
 import { computePopoverPlacement } from "./popover-placement";
 import { fetchClientSecret, RealtimeSession } from "./realtime-session";
-import {
-  TOOLBAR_BUTTON_SIZE,
-  resolveToolbarAnchor,
-  type ToolbarAnchorResult
-} from "./toolbar-anchor";
 import {
   closePanel as closeShellPanel,
   confirmConnected,
   createInitialInterviewShellState,
   endSession,
+  openPanel as openShellPanel,
   sessionFailed,
   startSession,
   tickTimer,
@@ -36,6 +38,12 @@ import {
   type InterviewShellState
 } from "./state";
 import { INITIAL_OVERLAY_SYNC_DELAYS_MS } from "./overlay-bootstrap";
+import {
+  TOOLBAR_BUTTON_SIZE,
+  resolveToolbarAnchor,
+  type RectLike,
+  type ToolbarAnchorResult
+} from "./toolbar-anchor";
 import { shouldMountInterviewOverlay } from "./overlay-visibility";
 
 const PANEL_WIDTH = 336;
@@ -43,8 +51,6 @@ const PANEL_ESTIMATED_HEIGHT = 260;
 
 const API_BASE_URL =
   process.env.PLASMO_PUBLIC_API_HOST ?? "http://localhost:8000";
-
-type PageTone = "dark" | "light";
 
 const formatTime = (totalSeconds: number): string => {
   const clamped = Math.max(0, totalSeconds);
@@ -59,31 +65,14 @@ const formatTime = (totalSeconds: number): string => {
 const getConnectionLabel = (status: InterviewShellState["sessionStatus"]) => {
   switch (status) {
     case "connected":
-      return "Connected";
+      return "Session connected";
     case "connecting":
-      return "Connecting";
+      return "Session connecting";
     case "ended":
-      return "Ended";
+      return "Session ended";
     case "idle":
     default:
-      return "Idle";
-  }
-};
-
-const getStatusTone = (
-  status: InterviewShellState["sessionStatus"],
-  pageTone: PageTone
-) => {
-  switch (status) {
-    case "connected":
-      return pageTone === "dark" ? "#5ee3a1" : "#1d7a57";
-    case "ended":
-      return "#e05c7b";
-    case "connecting":
-      return "#60a5fa";
-    case "idle":
-    default:
-      return pageTone === "dark" ? "#a7b4c6" : "#475569";
+      return "Session idle";
   }
 };
 
@@ -92,10 +81,24 @@ const getViewport = () => ({
   height: window.innerHeight
 });
 
-const readPageTone = (): PageTone => {
-  const sample =
-    window.getComputedStyle(document.body).backgroundColor ||
-    window.getComputedStyle(document.documentElement).backgroundColor;
+const isTransparentBackground = (sample: string) => {
+  const normalized = sample.trim().toLowerCase();
+
+  return (
+    normalized === "" ||
+    normalized === "transparent" ||
+    normalized === "rgba(0, 0, 0, 0)" ||
+    normalized === "rgba(0,0,0,0)"
+  );
+};
+
+export const resolvePageTone = (
+  bodyBackgroundColor: string,
+  documentBackgroundColor: string
+): PageTone => {
+  const sample = isTransparentBackground(bodyBackgroundColor)
+    ? documentBackgroundColor
+    : bodyBackgroundColor;
   const match = sample.match(/\d+/g);
 
   if (!match || match.length < 3) {
@@ -108,13 +111,19 @@ const readPageTone = (): PageTone => {
   return luminance < 140 ? "dark" : "light";
 };
 
+const readPageTone = (): PageTone =>
+  resolvePageTone(
+    window.getComputedStyle(document.body).backgroundColor,
+    window.getComputedStyle(document.documentElement).backgroundColor
+  );
+
 const difficultyColor = (
-  d: LeetCodeProblem["difficulty"],
+  difficulty: LeetCodeProblem["difficulty"],
   tone: PageTone
 ): string => {
-  if (d === "Easy") return tone === "dark" ? "#4ade80" : "#15803d";
-  if (d === "Medium") return tone === "dark" ? "#fbbf24" : "#d97706";
-  if (d === "Hard") return tone === "dark" ? "#f87171" : "#dc2626";
+  if (difficulty === "Easy") return tone === "dark" ? "#4ade80" : "#15803d";
+  if (difficulty === "Medium") return tone === "dark" ? "#fbbf24" : "#d97706";
+  if (difficulty === "Hard") return tone === "dark" ? "#f87171" : "#dc2626";
   return tone === "dark" ? "#94a3b8" : "#64748b";
 };
 
@@ -125,6 +134,28 @@ const sameAnchor = (left: ToolbarAnchorResult, right: ToolbarAnchorResult) =>
   left.buttonRect.width === right.buttonRect.width &&
   left.buttonRect.height === right.buttonRect.height;
 
+const samePopoverPlacement = (
+  left: { top: number; left: number; transformOrigin: string },
+  right: { top: number; left: number; transformOrigin: string }
+) =>
+  left.top === right.top &&
+  left.left === right.left &&
+  left.transformOrigin === right.transformOrigin;
+
+export const getAnchorWrapperStyle = (
+  buttonRect: Pick<ToolbarAnchorResult["buttonRect"], "top" | "right">,
+  viewportWidth: number
+): CSSProperties => ({
+  ...styles.anchorWrapper,
+  top: `${buttonRect.top}px`,
+  right: `${viewportWidth - buttonRect.right}px`
+});
+
+export const resolvePanelAnchorRect = (
+  baseControlRect: RectLike | null,
+  fallbackRect: RectLike
+): RectLike => baseControlRect ?? fallbackRect;
+
 export const InterviewOverlay = () => {
   const [isVisible, setIsVisible] = useState(() =>
     shouldMountInterviewOverlay(new URL(window.location.href), document)
@@ -133,6 +164,7 @@ export const InterviewOverlay = () => {
   const [anchor, setAnchor] = useState<ToolbarAnchorResult>(() =>
     resolveToolbarAnchor(document, getViewport())
   );
+  const [viewportWidth, setViewportWidth] = useState(() => getViewport().width);
   const [pageTone, setPageTone] = useState<PageTone>(() => readPageTone());
   const [popoverPlacement, setPopoverPlacement] = useState(() =>
     computePopoverPlacement(
@@ -145,11 +177,10 @@ export const InterviewOverlay = () => {
     )
   );
   const [problem, setProblem] = useState<LeetCodeProblem | null>(null);
-  const buttonRef = useRef<HTMLButtonElement | null>(null);
-  const popoverRef = useRef<HTMLDivElement | null>(null);
+  const baseControlRef = useRef<HTMLElement | null>(null);
+  const popoverRef = useRef<HTMLElement | null>(null);
   const sessionRef = useRef<RealtimeSession | null>(null);
 
-  // Show/hide based on URL and toolbar presence (replaces content-script syncOverlay)
   useEffect(() => {
     let rafId = 0;
 
@@ -194,7 +225,6 @@ export const InterviewOverlay = () => {
     };
   }, []);
 
-  // Tick countdown while connected
   useEffect(() => {
     const sync = () => {
       const nextProblem = extractLeetCodeProblem(
@@ -227,7 +257,6 @@ export const InterviewOverlay = () => {
     };
   }, [state.sessionStatus]);
 
-  // Clean up WebRTC when session ends (including auto-expiry)
   useEffect(() => {
     if (state.sessionStatus === "ended") {
       sessionRef.current?.end();
@@ -253,6 +282,7 @@ export const InterviewOverlay = () => {
           setAnchor((currentAnchor) =>
             sameAnchor(currentAnchor, nextAnchor) ? currentAnchor : nextAnchor
           );
+          setViewportWidth(viewport.width);
           setPageTone(nextTone);
         });
       });
@@ -280,22 +310,43 @@ export const InterviewOverlay = () => {
   }, []);
 
   useLayoutEffect(() => {
-    if (!state.isPanelOpen) {
+    if (!state.isPanelExpanded) {
       return;
     }
 
+    const baseControlBounds =
+      baseControlRef.current instanceof HTMLElement
+        ? baseControlRef.current.getBoundingClientRect()
+        : null;
+    const baseControlRect = baseControlBounds
+      ? ({
+          top: baseControlBounds.top,
+          left: baseControlBounds.left,
+          width: baseControlBounds.width,
+          height: baseControlBounds.height,
+          right: baseControlBounds.right,
+          bottom: baseControlBounds.bottom
+        } satisfies RectLike)
+      : null;
     const popoverSize = {
       width: popoverRef.current?.offsetWidth ?? PANEL_WIDTH,
       height: popoverRef.current?.offsetHeight ?? PANEL_ESTIMATED_HEIGHT
     };
-
-    setPopoverPlacement(
-      computePopoverPlacement(anchor.buttonRect, popoverSize, getViewport())
+    const nextPlacement = computePopoverPlacement(
+      resolvePanelAnchorRect(baseControlRect, anchor.buttonRect),
+      popoverSize,
+      getViewport()
     );
-  }, [anchor, state.isPanelOpen]);
+
+    setPopoverPlacement((currentPlacement) =>
+      samePopoverPlacement(currentPlacement, nextPlacement)
+        ? currentPlacement
+        : nextPlacement
+    );
+  });
 
   useEffect(() => {
-    if (!state.isPanelOpen) {
+    if (!state.isPanelExpanded || state.sessionStatus === "connecting") {
       return undefined;
     }
 
@@ -303,7 +354,7 @@ export const InterviewOverlay = () => {
       const path = event.composedPath();
 
       if (
-        (buttonRef.current && path.includes(buttonRef.current)) ||
+        (baseControlRef.current && path.includes(baseControlRef.current)) ||
         (popoverRef.current && path.includes(popoverRef.current))
       ) {
         return;
@@ -325,15 +376,11 @@ export const InterviewOverlay = () => {
       document.removeEventListener("pointerdown", handlePointerDown, true);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [state.isPanelOpen]);
+  }, [state.isPanelExpanded, state.sessionStatus]);
 
-  const togglePanel = () => {
-    setState((currentState) =>
-      currentState.isPanelOpen
-        ? closeShellPanel(currentState)
-        : { ...currentState, isPanelOpen: true }
-    );
-  };
+  const openPanel = useCallback(() => {
+    setState((currentState) => openShellPanel(currentState));
+  }, []);
 
   const handleStart = useCallback(() => {
     setState((currentState) => {
@@ -426,6 +473,13 @@ export const InterviewOverlay = () => {
     state.sessionStatus === "connecting" ||
     state.sessionStatus === "connected";
   const showCodeCaptureDebugAction = shouldShowCodeCaptureDebugAction();
+  const statusLabel = getConnectionLabel(state.sessionStatus);
+  const timerText = formatTime(state.remainingSeconds);
+  const paletteWithButton = palette as OverlayPalette & {
+    buttonBackground: string;
+    buttonBorder: string;
+    buttonText: string;
+  };
 
   if (!isVisible) {
     return null;
@@ -433,162 +487,59 @@ export const InterviewOverlay = () => {
 
   return (
     <div style={styles.host}>
-      <button
-        aria-expanded={state.isPanelOpen}
-        aria-label="Open Loop interviewer"
-        onClick={togglePanel}
-        ref={buttonRef}
-        style={{
-          ...styles.toolbarButton,
-          top: `${anchor.buttonRect.top}px`,
-          left: `${anchor.buttonRect.left}px`,
-          background: palette.buttonBackground,
-          borderColor: palette.buttonBorder,
-          color: palette.buttonText
+      <div
+        ref={(node) => {
+          baseControlRef.current = node;
         }}
-        type="button">
-        <span style={styles.buttonCore}>L</span>
-      </button>
-
-      {state.isPanelOpen ? (
-        <section
-          aria-label="Loop interviewer popover"
-          ref={popoverRef}
-          style={{
-            ...styles.popover,
-            top: `${popoverPlacement.top}px`,
-            left: `${popoverPlacement.left}px`,
-            transformOrigin: popoverPlacement.transformOrigin,
-            background: palette.panelBackground,
-            borderColor: palette.panelBorder,
-            color: palette.panelText
-          }}>
-          <div style={styles.headerRow}>
-            <div>
-              <p style={{ ...styles.eyebrow, color: palette.subtleText }}>Loop</p>
-              <h2 style={styles.title}>Interviewer</h2>
-            </div>
-            <button
-              aria-label="Close interviewer panel"
-              onClick={() => setState((currentState) => closeShellPanel(currentState))}
-              style={{
-                ...styles.iconButton,
-                background: palette.secondaryBackground,
-                borderColor: palette.secondaryBorder,
-                color: palette.panelText
-              }}
-              type="button">
-              ×
-            </button>
-          </div>
-
-          {problem ? (
-            <div style={styles.problemCard}>
-              <span
-                style={{
-                  ...styles.difficultyBadge,
-                  color: difficultyColor(problem.difficulty, pageTone)
-                }}>
-                {problem.difficulty ?? "\u2014"}
-              </span>
-              <span
-                style={{ ...styles.problemTitle, color: palette.panelText }}
-                title={problem.title}>
-                {problem.title || problem.slug}
-              </span>
-            </div>
-          ) : null}
-
-          <div style={styles.summaryRow}>
-            <div
-              aria-live="polite"
-              style={{
-                ...styles.statusPill,
-                color: getStatusTone(state.sessionStatus, pageTone),
-                backgroundColor:
-                  pageTone === "dark" ? "rgba(30, 41, 59, 0.68)" : "rgba(255,255,255,0.8)"
-              }}>
-              <span
-                style={{
-                  ...styles.statusDot,
-                  backgroundColor: getStatusTone(state.sessionStatus, pageTone)
-                }}
-              />
-              {getConnectionLabel(state.sessionStatus)}
-            </div>
-            <span style={{ ...styles.inlineHint, color: palette.subtleText }}>
-              toolbar popover
-            </span>
-          </div>
-
-          <div
+        style={getAnchorWrapperStyle(anchor.buttonRect, viewportWidth)}>
+        {state.baseControlMode === "launcher" ? (
+          <button
+            aria-expanded={state.isPanelExpanded}
+            aria-label="Open Loop interviewer"
+            onClick={openPanel}
             style={{
-              ...styles.timerCard,
-              background: palette.timerBackground
-            }}>
-            <span style={styles.timerLabel}>Time remaining</span>
-            <strong style={styles.timerValue}>
-              {formatTime(state.remainingSeconds)}
-            </strong>
-          </div>
+              ...styles.toolbarButton,
+              background: paletteWithButton.buttonBackground,
+              borderColor: paletteWithButton.buttonBorder,
+              color: paletteWithButton.buttonText
+            }}
+            type="button">
+            <span style={styles.buttonCore}>L</span>
+          </button>
+        ) : (
+          <CollapsedToolbar
+            onEnd={handleEnd}
+            onExpand={openPanel}
+            onMuteToggle={handleMuteToggle}
+            pageTone={pageTone}
+            state={state}
+            statusLabel={statusLabel}
+            timerText={timerText}
+          />
+        )}
+      </div>
 
-          <div style={styles.primaryControls}>
-            <button
-              disabled={isStartDisabled}
-              onClick={handleStart}
-              style={{
-                ...styles.primaryButton,
-                opacity: isStartDisabled ? 0.5 : 1,
-                cursor: isStartDisabled ? "default" : "pointer"
-              }}
-              type="button">
-              {state.sessionStatus === "connecting" ? "Connecting…" : "Start"}
-            </button>
-            <button
-              onClick={handleEnd}
-              style={{
-                ...styles.secondaryButton,
-                background: palette.secondaryBackground,
-                borderColor: palette.secondaryBorder,
-                color: palette.panelText
-              }}
-              type="button">
-              End
-            </button>
-          </div>
-
-          <div style={styles.footerRow}>
-            <button
-              onClick={handleMuteToggle}
-              style={{
-                ...styles.utilityButton,
-                background: palette.utilityBackground,
-                color: palette.utilityText
-              }}
-              type="button">
-              {state.isMuted ? "Unmute mic" : "Mute mic"}
-            </button>
-            <span style={{ ...styles.hintText, color: palette.subtleText }}>
-              outside click closes
-            </span>
-          </div>
-
-          {showCodeCaptureDebugAction ? (
-            <div style={styles.debugRow}>
-              <button
-                onClick={handleCaptureCode}
-                style={{
-                  ...styles.debugButton,
-                  background: palette.secondaryBackground,
-                  borderColor: palette.secondaryBorder,
-                  color: palette.panelText
-                }}
-                type="button">
-                Capture code
-              </button>
-            </div>
-          ) : null}
-        </section>
+      {state.isPanelExpanded ? (
+        <ExpandedPanel
+          ref={popoverRef}
+          isStartDisabled={isStartDisabled}
+          onCaptureCode={handleCaptureCode}
+          onClose={() => setState((currentState) => closeShellPanel(currentState))}
+          onEnd={handleEnd}
+          onMuteToggle={handleMuteToggle}
+          onStart={handleStart}
+          pageTone={pageTone}
+          palette={palette}
+          popoverLeft={popoverPlacement.left}
+          popoverTop={popoverPlacement.top}
+          problem={problem}
+          problemDifficultyColor={difficultyColor(problem?.difficulty ?? null, pageTone)}
+          showCodeCaptureDebugAction={showCodeCaptureDebugAction}
+          state={state}
+          statusLabel={statusLabel}
+          timerText={timerText}
+          transformOrigin={popoverPlacement.transformOrigin}
+        />
       ) : null}
     </div>
   );
@@ -601,16 +552,20 @@ const styles: Record<string, CSSProperties> = {
     fontFamily:
       '"IBM Plex Sans", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
   },
-  toolbarButton: {
+  anchorWrapper: {
     position: "fixed",
+    display: "flex",
+    alignItems: "center",
+    height: `${TOOLBAR_BUTTON_SIZE}px`,
+    pointerEvents: "auto"
+  },
+  toolbarButton: {
     width: `${TOOLBAR_BUTTON_SIZE}px`,
     height: `${TOOLBAR_BUTTON_SIZE}px`,
     borderRadius: "12px",
     border: "1px solid",
     display: "grid",
     placeItems: "center",
-    boxShadow: "0 12px 28px rgba(15, 23, 42, 0.24)",
-    pointerEvents: "auto",
     cursor: "pointer",
     padding: 0
   },
@@ -618,166 +573,5 @@ const styles: Record<string, CSSProperties> = {
     fontSize: "14px",
     fontWeight: 700,
     lineHeight: 1
-  },
-  popover: {
-    position: "fixed",
-    width: `${PANEL_WIDTH}px`,
-    borderRadius: "20px",
-    border: "1px solid",
-    boxShadow: "0 28px 60px rgba(15, 23, 42, 0.28)",
-    padding: "14px",
-    pointerEvents: "auto",
-    backdropFilter: "blur(12px)"
-  },
-  headerRow: {
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: "16px"
-  },
-  eyebrow: {
-    margin: 0,
-    fontSize: "10px",
-    fontWeight: 700,
-    letterSpacing: "0.12em",
-    textTransform: "uppercase"
-  },
-  title: {
-    margin: "4px 0 0",
-    fontSize: "28px",
-    lineHeight: 0.95,
-    letterSpacing: "-0.04em"
-  },
-  iconButton: {
-    width: "32px",
-    height: "32px",
-    borderRadius: "999px",
-    border: "1px solid",
-    display: "grid",
-    placeItems: "center",
-    fontSize: "22px",
-    lineHeight: 1,
-    flexShrink: 0,
-    cursor: "pointer"
-  },
-  summaryRow: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "12px",
-    marginTop: "10px"
-  },
-  statusPill: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "8px",
-    borderRadius: "999px",
-    padding: "8px 12px",
-    fontSize: "13px",
-    fontWeight: 700
-  },
-  statusDot: {
-    width: "10px",
-    height: "10px",
-    borderRadius: "999px"
-  },
-  inlineHint: {
-    fontSize: "11px",
-    textTransform: "uppercase",
-    letterSpacing: "0.06em"
-  },
-  timerCard: {
-    marginTop: "14px",
-    color: "#e2e8f0",
-    borderRadius: "18px",
-    padding: "16px 18px"
-  },
-  timerLabel: {
-    display: "block",
-    fontSize: "11px",
-    textTransform: "uppercase",
-    letterSpacing: "0.12em",
-    color: "#94a3b8"
-  },
-  timerValue: {
-    display: "block",
-    marginTop: "10px",
-    fontSize: "44px",
-    lineHeight: 1,
-    letterSpacing: "-0.05em"
-  },
-  primaryControls: {
-    display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "10px",
-    marginTop: "14px"
-  },
-  primaryButton: {
-    border: "none",
-    borderRadius: "14px",
-    backgroundColor: "#0f766e",
-    color: "#f8fafc",
-    padding: "13px 10px",
-    fontWeight: 700
-  },
-  secondaryButton: {
-    borderRadius: "14px",
-    border: "1px solid",
-    padding: "13px 10px",
-    fontWeight: 700,
-    cursor: "pointer"
-  },
-  footerRow: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "10px",
-    marginTop: "14px"
-  },
-  utilityButton: {
-    border: "none",
-    borderRadius: "999px",
-    padding: "10px 14px",
-    fontWeight: 700,
-    cursor: "pointer",
-    whiteSpace: "nowrap"
-  },
-  hintText: {
-    fontSize: "12px",
-    textAlign: "right"
-  },
-  debugRow: {
-    display: "flex",
-    justifyContent: "flex-end",
-    marginTop: "12px"
-  },
-  debugButton: {
-    borderRadius: "12px",
-    border: "1px solid",
-    padding: "10px 12px",
-    fontSize: "12px",
-    fontWeight: 700,
-    cursor: "pointer"
-  },
-  problemCard: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    marginTop: "10px",
-    overflow: "hidden"
-  },
-  difficultyBadge: {
-    fontSize: "11px",
-    fontWeight: 700,
-    textTransform: "uppercase",
-    letterSpacing: "0.08em",
-    flexShrink: 0
-  },
-  problemTitle: {
-    fontSize: "13px",
-    fontWeight: 600,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap"
   }
 };
