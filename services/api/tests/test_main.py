@@ -107,3 +107,23 @@ def test_create_realtime_session_rejects_missing_problem() -> None:
     response = client.post("/v1/realtime/sessions", json={})
 
     assert response.status_code == 422
+
+
+def test_create_realtime_session_rejects_placeholder_problem_content() -> None:
+    client = TestClient(create_app())
+
+    response = client.post(
+        "/v1/realtime/sessions",
+        json={
+            "problem": {
+                "slug": "cannot-parse-slug",
+                "title": "Cannot parse title",
+                "difficulty": "Unknown",
+                "description": "Cannot parse description",
+                "examples": [],
+                "constraints": [],
+            }
+        },
+    )
+
+    assert response.status_code == 422

@@ -4,6 +4,7 @@ from typing import Any
 
 import httpx
 
+from app.core.prompt_compiler import compile_realtime_instructions
 from app.models.realtime import RealtimeSessionRequest
 
 
@@ -26,12 +27,14 @@ class RealtimeClientSecretBroker:
         self._http_client = http_client
 
     def create(self, request: RealtimeSessionRequest) -> dict[str, Any]:
+        instructions = compile_realtime_instructions(self._instructions, request.problem)
+        print(f"[loop] Compiled realtime instructions:\n{instructions}")
         payload = {
             "expires_after": {"anchor": "created_at", "seconds": self._max_interview_seconds},
             "session": {
                 "type": "realtime",
                 "model": self._model,
-                "instructions": self._instructions,
+                "instructions": instructions,
                 "audio": {
                     "output": {
                         "voice": self._voice,
@@ -39,7 +42,6 @@ class RealtimeClientSecretBroker:
                 },
             },
         }
-        _ = request
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
