@@ -4,6 +4,8 @@ from typing import Any
 
 import httpx
 
+from app.models.realtime import RealtimeSessionRequest
+
 
 class RealtimeClientSecretBroker:
     def __init__(
@@ -23,7 +25,7 @@ class RealtimeClientSecretBroker:
         self._max_interview_seconds = max_interview_seconds
         self._http_client = http_client
 
-    def create(self) -> dict[str, Any]:
+    def create(self, request: RealtimeSessionRequest) -> dict[str, Any]:
         payload = {
             "expires_after": {"anchor": "created_at", "seconds": self._max_interview_seconds},
             "session": {
@@ -37,6 +39,7 @@ class RealtimeClientSecretBroker:
                 },
             },
         }
+        _ = request
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",

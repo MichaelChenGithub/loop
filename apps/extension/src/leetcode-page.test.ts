@@ -469,13 +469,75 @@ describe("buildProblemPayloadForBackend", () => {
       constraints: ["2 <= nums.length <= 10^4"]
     };
 
-    expect(buildProblemPayloadForBackend(problem)).toEqual({
+    expect(
+      buildProblemPayloadForBackend(
+        problem,
+        new URL("https://leetcode.com/problems/two-sum/")
+      )
+    ).toEqual({
       problem
     });
   });
 
-  it("returns null when no problem has been parsed", () => {
-    expect(buildProblemPayloadForBackend(null)).toBeNull();
+  it("fills fallback fields when parsing is partial", () => {
+    expect(
+      buildProblemPayloadForBackend(
+        {
+          slug: "two-sum",
+          title: "",
+          difficulty: null,
+          description: "",
+          examples: [],
+          constraints: []
+        },
+        new URL("https://leetcode.com/problems/two-sum/")
+      )
+    ).toEqual({
+      problem: {
+        slug: "two-sum",
+        title: "Cannot parse title",
+        difficulty: "Unknown",
+        description: "Cannot parse description",
+        examples: [],
+        constraints: []
+      }
+    });
+  });
+
+  it("builds a fallback payload when no problem has been parsed", () => {
+    expect(
+      buildProblemPayloadForBackend(
+        null,
+        new URL("https://leetcode.com/problems/two-sum/")
+      )
+    ).toEqual({
+      problem: {
+        slug: "two-sum",
+        title: "Cannot parse title",
+        difficulty: "Unknown",
+        description: "Cannot parse description",
+        examples: [],
+        constraints: []
+      }
+    });
+  });
+
+  it("falls back to a sentinel slug when the URL is not a problem page", () => {
+    expect(
+      buildProblemPayloadForBackend(
+        null,
+        new URL("https://leetcode.com/problemset/")
+      )
+    ).toEqual({
+      problem: {
+        slug: "cannot-parse-slug",
+        title: "Cannot parse title",
+        difficulty: "Unknown",
+        description: "Cannot parse description",
+        examples: [],
+        constraints: []
+      }
+    });
   });
 });
 
@@ -495,7 +557,10 @@ describe("logLeetCodeProblemForDebug", () => {
       constraints: ["2 <= nums.length <= 10^4"]
     };
 
-    logLeetCodeProblemForDebug(problem);
+    logLeetCodeProblemForDebug(
+      problem,
+      new URL("https://leetcode.com/problems/two-sum/")
+    );
 
     expect(infoSpy).toHaveBeenCalledWith("[loop] Outbound backend payload", {
       problem
@@ -507,11 +572,23 @@ describe("logLeetCodeProblemForDebug", () => {
   it("logs when no problem payload could be extracted", () => {
     const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
 
-    logLeetCodeProblemForDebug(null);
+    logLeetCodeProblemForDebug(
+      null,
+      new URL("https://leetcode.com/problems/two-sum/")
+    );
 
     expect(infoSpy).toHaveBeenCalledWith(
       "[loop] Outbound backend payload",
-      null
+      {
+        problem: {
+          slug: "two-sum",
+          title: "Cannot parse title",
+          difficulty: "Unknown",
+          description: "Cannot parse description",
+          examples: [],
+          constraints: []
+        }
+      }
     );
 
     infoSpy.mockRestore();
