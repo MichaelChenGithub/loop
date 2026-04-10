@@ -9,6 +9,7 @@ import {
 } from "react";
 
 import {
+  buildProblemPayloadForBackend,
   extractLeetCodeProblem,
   logLeetCodeProblemForDebug,
   LOOP_NAVIGATE_EVENT,
@@ -198,7 +199,7 @@ export const InterviewOverlay = () => {
         document,
         new URL(window.location.href)
       );
-      logLeetCodeProblemForDebug(nextProblem);
+      logLeetCodeProblemForDebug(nextProblem, new URL(window.location.href));
       setProblem(nextProblem);
     };
     sync();
@@ -346,7 +347,10 @@ export const InterviewOverlay = () => {
 
     void (async () => {
       try {
-        const secret = await fetchClientSecret(API_BASE_URL);
+        const secret = await fetchClientSecret(
+          API_BASE_URL,
+          buildProblemPayloadForBackend(problem, new URL(window.location.href))
+        );
         const session = new RealtimeSession();
         sessionRef.current = session;
         await session.start(secret.value, secret.session.model);
@@ -360,7 +364,7 @@ export const InterviewOverlay = () => {
         setState((currentState) => sessionFailed(currentState));
       }
     })();
-  }, []);
+  }, [problem]);
 
   const handleEnd = useCallback(() => {
     sessionRef.current?.end();

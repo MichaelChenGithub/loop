@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { RealtimeSession } from "./realtime-session";
+import { fetchClientSecret, RealtimeSession } from "./realtime-session";
 
 describe("RealtimeSession.start", () => {
   const originalPeerConnection = globalThis.RTCPeerConnection;
@@ -163,6 +163,68 @@ describe("RealtimeSession.start", () => {
 
     await expect(session.start("ek_test_123", "gpt-realtime")).rejects.toThrow(
       "API version mismatch"
+    );
+  });
+});
+
+describe("fetchClientSecret", () => {
+  const originalFetch = globalThis.fetch;
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it("posts the normalized problem payload to the session broker", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          value: "ek_123",
+          expires_at: 1_900_000_000,
+          session: {
+            id: "sess_123",
+            model: "gpt-realtime-2025-08-25",
+            object: "realtime.session",
+            type: "realtime"
+          }
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        }
+      )
+    );
+    globalThis.fetch = fetchMock;
+
+    await fetchClientSecret("http://localhost:8000", {
+      problem: {
+        slug: "two-sum",
+        title: "Two Sum",
+        difficulty: "Easy",
+        description: "Given an array of integers nums and an integer target.",
+        examples: [{ input: "nums = [2,7], target = 9", output: "[0,1]" }],
+        constraints: ["2 <= nums.length <= 10^4"]
+      }
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8000/v1/realtime/sessions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          problem: {
+            slug: "two-sum",
+            title: "Two Sum",
+            difficulty: "Easy",
+            description: "Given an array of integers nums and an integer target.",
+            examples: [{ input: "nums = [2,7], target = 9", output: "[0,1]" }],
+            constraints: ["2 <= nums.length <= 10^4"]
+          }
+        })
+      }
     );
   });
 });

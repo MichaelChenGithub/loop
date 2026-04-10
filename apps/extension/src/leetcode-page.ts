@@ -1,4 +1,5 @@
 export type LeetCodeDifficulty = "Easy" | "Medium" | "Hard";
+export type BackendProblemDifficulty = LeetCodeDifficulty | "Unknown";
 
 export type LeetCodeExample = {
   input: string;
@@ -15,8 +16,17 @@ export type LeetCodeProblem = {
   constraints: string[];
 };
 
+export type ProblemForBackend = {
+  slug: string;
+  title: string;
+  difficulty: BackendProblemDifficulty;
+  description: string;
+  examples: LeetCodeExample[];
+  constraints: string[];
+};
+
 export type ProblemPayloadForBackend = {
-  problem: LeetCodeProblem;
+  problem: ProblemForBackend;
 };
 
 /**
@@ -225,20 +235,29 @@ export const extractLeetCodeProblem = (
 };
 
 export const buildProblemPayloadForBackend = (
-  problem: LeetCodeProblem | null
-): ProblemPayloadForBackend | null => {
-  if (!problem) {
-    return null;
-  }
+  problem: LeetCodeProblem | null,
+  url: URL
+): ProblemPayloadForBackend => {
+  const fallbackSlug = slugFromUrl(url) ?? "cannot-parse-slug";
 
-  return { problem };
+  return {
+    problem: {
+      slug: problem?.slug.trim() || fallbackSlug,
+      title: problem?.title.trim() || "Cannot parse title",
+      difficulty: problem?.difficulty ?? "Unknown",
+      description: problem?.description.trim() || "Cannot parse description",
+      examples: problem?.examples ?? [],
+      constraints: problem?.constraints ?? [],
+    },
+  };
 };
 
 export const logLeetCodeProblemForDebug = (
-  problem: LeetCodeProblem | null
+  problem: LeetCodeProblem | null,
+  url: URL
 ): void => {
   console.info(
     "[loop] Outbound backend payload",
-    buildProblemPayloadForBackend(problem)
+    buildProblemPayloadForBackend(problem, url)
   );
 };
