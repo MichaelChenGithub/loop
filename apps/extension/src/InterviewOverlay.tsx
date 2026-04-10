@@ -16,6 +16,7 @@ import {
   LOOP_NAVIGATE_EVENT,
   type LeetCodeProblem
 } from "./leetcode-page";
+import { createIdleCodeSyncController } from "./code-sync-policy";
 import { captureLatestCodeSnapshot } from "./code-snapshot-runtime";
 import { shouldShowCodeCaptureDebugAction } from "./debug-controls";
 import {
@@ -46,6 +47,7 @@ import {
   type ToolbarAnchorResult
 } from "./toolbar-anchor";
 import { shouldMountInterviewOverlay } from "./overlay-visibility";
+import { isLeetCodeEditorInputTarget } from "./leetcode-editor";
 
 const PANEL_WIDTH = 336;
 const PANEL_ESTIMATED_HEIGHT = 260;
@@ -157,6 +159,37 @@ export const resolvePanelAnchorRect = (
   fallbackRect: RectLike
 ): RectLike => baseControlRect ?? fallbackRect;
 
+export const startInterviewSessionAttempt = async ({
+  captureLatestCodeSnapshot: captureLatestCodeSnapshotImpl,
+  fetchClientSecret: fetchClientSecretImpl,
+  createRealtimeSession,
+  apiBaseUrl,
+  locationHref,
+  problem,
+  nowMs = Date.now()
+}: {
+  captureLatestCodeSnapshot: typeof captureLatestCodeSnapshot;
+  fetchClientSecret: typeof fetchClientSecret;
+  createRealtimeSession: () => RealtimeSession | { start: RealtimeSession["start"] };
+  apiBaseUrl: string;
+  locationHref: string;
+  problem: LeetCodeProblem | null;
+  nowMs?: number;
+}) => {
+  await captureLatestCodeSnapshotImpl().catch(() => ({ snapshot: null }));
+
+  const secret = await fetchClientSecretImpl(
+    apiBaseUrl,
+    buildProblemPayloadForBackend(problem, new URL(locationHref))
+  );
+  const session = createRealtimeSession();
+  await session.start(secret.value, secret.session.model);
+
+  return {
+    session,
+    remainingSeconds: secret.expires_at - Math.floor(nowMs / 1000)
+  };
+};
 export const LauncherButton = ({
   isExpanded,
   onClick,
@@ -283,6 +316,33 @@ export const InterviewOverlay = () => {
 
     return () => {
       window.clearInterval(intervalId);
+    };
+  }, [state.sessionStatus]);
+
+  useEffect(() => {
+    if (state.sessionStatus !== "connected") {
+      return undefined;
+    }
+
+    const syncController = createIdleCodeSyncController({
+      capture: async () => {
+        await captureLatestCodeSnapshot().catch(() => ({ snapshot: null }));
+      }
+    });
+
+    const handleEditorInput = (event: Event) => {
+      if (!isLeetCodeEditorInputTarget(event.target)) {
+        return;
+      }
+
+      syncController.notifyEditorActivity();
+    };
+
+    document.addEventListener("input", handleEditorInput, true);
+
+    return () => {
+      syncController.dispose();
+      document.removeEventListener("input", handleEditorInput, true);
     };
   }, [state.sessionStatus]);
 
@@ -425,16 +485,15 @@ export const InterviewOverlay = () => {
 
     void (async () => {
       try {
-        await captureLatestCodeSnapshot().catch(() => ({ snapshot: null }));
-        const secret = await fetchClientSecret(
-          API_BASE_URL,
-          buildProblemPayloadForBackend(problem, new URL(window.location.href))
-        );
-        const session = new RealtimeSession();
-        sessionRef.current = session;
-        await session.start(secret.value, secret.session.model);
-        const remainingSeconds =
-          secret.expires_at - Math.floor(Date.now() / 1000);
+        const { session, remainingSeconds } = await startInterviewSessionAttempt({
+          captureLatestCodeSnapshot,
+          fetchClientSecret,
+          createRealtimeSession: () => new RealtimeSession(),
+          apiBaseUrl: API_BASE_URL,
+          locationHref: window.location.href,
+          problem
+        });
+        sessionRef.current = session as RealtimeSession;
         setState((currentState) =>
           confirmConnected(currentState, remainingSeconds)
         );

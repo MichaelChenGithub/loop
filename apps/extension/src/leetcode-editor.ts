@@ -17,6 +17,11 @@ const TEXTAREA_SELECTOR =
   '.monaco-editor textarea, .monaco-editor [data-testid="code-area"] textarea';
 const VIEW_LINES_SELECTOR = ".monaco-editor .view-lines";
 
+export const isLeetCodeEditorInputTarget = (
+  target: EventTarget | null
+): target is Element =>
+  target instanceof Element && target.matches(TEXTAREA_SELECTOR);
+
 const normalizeLineText = (text: string): string =>
   text.replace(/\u00a0/g, " ");
 

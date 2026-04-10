@@ -25,9 +25,22 @@ type SendPageMessage = (
 export const getLatestCodeSnapshot = (): LatestCodeSnapshot | null =>
   latestCodeSnapshot;
 
+export const hasMeaningfulSnapshotChange = (
+  currentSnapshot: LatestCodeSnapshot | null,
+  nextSnapshot: LatestCodeSnapshot
+): boolean =>
+  currentSnapshot === null ||
+  currentSnapshot.code !== nextSnapshot.code ||
+  currentSnapshot.language !== nextSnapshot.language ||
+  currentSnapshot.problemSlug !== nextSnapshot.problemSlug;
+
 export const setLatestCodeSnapshot = (
   snapshot: LatestCodeSnapshot
 ): LatestCodeSnapshot => {
+  if (!hasMeaningfulSnapshotChange(latestCodeSnapshot, snapshot)) {
+    return latestCodeSnapshot ?? snapshot;
+  }
+
   latestCodeSnapshot = snapshot;
   return snapshot;
 };
