@@ -1,0 +1,58 @@
+from __future__ import annotations
+
+from typing import Any
+
+import httpx
+
+
+class RealtimeClientSecretBroker:
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        model: str,
+        voice: str,
+        instructions: str,
+        http_client: httpx.Client | None = None,
+    ) -> None:
+        self._api_key = api_key
+        self._model = model
+        self._voice = voice
+        self._instructions = instructions
+        self._http_client = http_client
+
+    def create(self) -> dict[str, Any]:
+        payload = {
+            "expires_after": {"anchor": "created_at", "seconds": 600},
+            "session": {
+                "type": "realtime",
+                "model": self._model,
+                "instructions": self._instructions,
+                "audio": {
+                    "output": {
+                        "voice": self._voice,
+                    }
+                },
+            },
+        }
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+
+        if self._http_client is not None:
+            response = self._http_client.post(
+                "https://api.openai.com/v1/realtime/client_secrets",
+                headers=headers,
+                json=payload,
+            )
+        else:
+            with httpx.Client(timeout=10.0) as client:
+                response = client.post(
+                    "https://api.openai.com/v1/realtime/client_secrets",
+                    headers=headers,
+                    json=payload,
+                )
+
+        response.raise_for_status()
+        return response.json()
