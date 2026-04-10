@@ -8,6 +8,12 @@ import {
   type CSSProperties
 } from "react";
 
+import {
+  extractLeetCodeProblem,
+  logLeetCodeProblemForDebug,
+  LOOP_NAVIGATE_EVENT,
+  type LeetCodeProblem
+} from "./leetcode-page";
 import { computePopoverPlacement } from "./popover-placement";
 import { fetchClientSecret, RealtimeSession } from "./realtime-session";
 import {
@@ -99,6 +105,16 @@ const readPageTone = (): PageTone => {
   return luminance < 140 ? "dark" : "light";
 };
 
+const difficultyColor = (
+  d: LeetCodeProblem["difficulty"],
+  tone: PageTone
+): string => {
+  if (d === "Easy") return tone === "dark" ? "#4ade80" : "#15803d";
+  if (d === "Medium") return tone === "dark" ? "#fbbf24" : "#d97706";
+  if (d === "Hard") return tone === "dark" ? "#f87171" : "#dc2626";
+  return tone === "dark" ? "#94a3b8" : "#64748b";
+};
+
 const sameAnchor = (left: ToolbarAnchorResult, right: ToolbarAnchorResult) =>
   left.mode === right.mode &&
   left.buttonRect.top === right.buttonRect.top &&
@@ -125,6 +141,7 @@ export const InterviewOverlay = () => {
       getViewport()
     )
   );
+  const [problem, setProblem] = useState<LeetCodeProblem | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const sessionRef = useRef<RealtimeSession | null>(null);
@@ -175,6 +192,24 @@ export const InterviewOverlay = () => {
   }, []);
 
   // Tick countdown while connected
+  useEffect(() => {
+    const sync = () => {
+      const nextProblem = extractLeetCodeProblem(
+        document,
+        new URL(window.location.href)
+      );
+      logLeetCodeProblemForDebug(nextProblem);
+      setProblem(nextProblem);
+    };
+    sync();
+    window.addEventListener(LOOP_NAVIGATE_EVENT, sync);
+    window.addEventListener("popstate", sync);
+    return () => {
+      window.removeEventListener(LOOP_NAVIGATE_EVENT, sync);
+      window.removeEventListener("popstate", sync);
+    };
+  }, []);
+
   useEffect(() => {
     if (state.sessionStatus !== "connected") {
       return undefined;
@@ -435,6 +470,23 @@ export const InterviewOverlay = () => {
             </button>
           </div>
 
+          {problem ? (
+            <div style={styles.problemCard}>
+              <span
+                style={{
+                  ...styles.difficultyBadge,
+                  color: difficultyColor(problem.difficulty, pageTone)
+                }}>
+                {problem.difficulty ?? "\u2014"}
+              </span>
+              <span
+                style={{ ...styles.problemTitle, color: palette.panelText }}
+                title={problem.title}>
+                {problem.title || problem.slug}
+              </span>
+            </div>
+          ) : null}
+
           <div style={styles.summaryRow}>
             <div
               aria-live="polite"
@@ -665,5 +717,26 @@ const styles: Record<string, CSSProperties> = {
   hintText: {
     fontSize: "12px",
     textAlign: "right"
+  },
+  problemCard: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    marginTop: "10px",
+    overflow: "hidden"
+  },
+  difficultyBadge: {
+    fontSize: "11px",
+    fontWeight: 700,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    flexShrink: 0
+  },
+  problemTitle: {
+    fontSize: "13px",
+    fontWeight: 600,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap"
   }
 };
