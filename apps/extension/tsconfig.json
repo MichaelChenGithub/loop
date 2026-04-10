@@ -2,7 +2,13 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "jsx": "react-jsx",
-    "types": ["chrome"]
+    "types": [
+      "chrome"
+    ]
   },
-  "include": ["src", "popup.tsx", "content.tsx", "background.ts"]
+  "include": [
+    ".plasmo/index.d.ts",
+    "src",
+    "popup.tsx"
+  ]
 }
