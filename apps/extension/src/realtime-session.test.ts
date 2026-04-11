@@ -567,23 +567,28 @@ describe("fetchClientSecret", () => {
     );
     globalThis.fetch = fetchMock;
 
-    await fetchClientSecret("http://localhost:8000", {
-      problem: {
-        slug: "two-sum",
-        title: "Two Sum",
-        difficulty: "Easy",
-        description: "Given an array of integers nums and an integer target.",
-        examples: [{ input: "nums = [2,7], target = 9", output: "[0,1]" }],
-        constraints: ["2 <= nums.length <= 10^4"]
-      }
-    });
+    await fetchClientSecret(
+      "http://localhost:8000",
+      {
+        problem: {
+          slug: "two-sum",
+          title: "Two Sum",
+          difficulty: "Easy",
+          description: "Given an array of integers nums and an integer target.",
+          examples: [{ input: "nums = [2,7], target = 9", output: "[0,1]" }],
+          constraints: ["2 <= nums.length <= 10^4"]
+        }
+      },
+      { Authorization: "Bearer test-token" }
+    );
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:8000/v1/realtime/sessions",
       {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          Authorization: "Bearer test-token"
         },
         body: JSON.stringify({
           problem: {
