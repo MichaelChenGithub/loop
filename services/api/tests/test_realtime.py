@@ -72,7 +72,15 @@ def test_broker_posts_backend_owned_defaults_to_openai() -> None:
     assert body["expires_after"] == {"anchor": "created_at", "seconds": 600}
     assert body["session"]["type"] == "realtime"
     assert body["session"]["model"] == "gpt-realtime-2025-08-25"
-    assert body["session"]["audio"] == {"output": {"voice": "alloy"}}
+    assert body["session"]["audio"] == {
+        "input": {
+            "turn_detection": {
+                "type": "server_vad",
+                "create_response": True,
+            }
+        },
+        "output": {"voice": "alloy"},
+    }
     assert body["session"]["tools"] == [
         {
             "type": "function",

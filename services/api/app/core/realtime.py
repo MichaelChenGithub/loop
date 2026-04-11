@@ -48,6 +48,12 @@ class RealtimeClientSecretBroker:
                 "model": self._model,
                 "instructions": instructions,
                 "audio": {
+                    "input": {
+                        "turn_detection": {
+                            "type": "server_vad",
+                            "create_response": True,
+                        }
+                    },
                     "output": {
                         "voice": self._voice,
                     }
