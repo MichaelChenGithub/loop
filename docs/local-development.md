@@ -23,7 +23,7 @@ Optional backend overrides:
 ```bash
 export OPENAI_REALTIME_MODEL=gpt-realtime-mini
 export OPENAI_REALTIME_VOICE=alloy
-export MAX_INTERVIEW_SECONDS=600
+export MAX_INTERVIEW_SECONDS=2400
 ```
 
 Verify the service:

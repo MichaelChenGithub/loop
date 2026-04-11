@@ -29,7 +29,7 @@ class RealtimeClientSecretBroker:
         model: str,
         voice: str,
         instructions: str,
-        max_interview_seconds: int = 600,
+        max_interview_seconds: int = 2400,
         http_client: httpx.Client | None = None,
     ) -> None:
         self._api_key = api_key

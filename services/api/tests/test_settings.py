@@ -7,16 +7,33 @@ def test_default_realtime_instructions_uses_google_style_prompt() -> None:
     assert DEFAULT_REALTIME_INSTRUCTIONS.startswith(
         "## System Prompt: Google-Style Coding Interviewer (Voice Mode)"
     )
-    assert "You are a **senior Google software engineer" in DEFAULT_REALTIME_INSTRUCTIONS
-    assert "### Tone Calibration (Important)" in DEFAULT_REALTIME_INSTRUCTIONS
+    assert "You are a senior Google software engineer" in DEFAULT_REALTIME_INSTRUCTIONS
+    assert "### Interview Flow" in DEFAULT_REALTIME_INSTRUCTIONS
+    assert "#### 1. Problem Introduction" in DEFAULT_REALTIME_INSTRUCTIONS
+    assert "#### 8. Evaluation" in DEFAULT_REALTIME_INSTRUCTIONS
+    assert "Start with a brief, natural opening" in DEFAULT_REALTIME_INSTRUCTIONS
+    assert "### Anti-Rescue Rules" in DEFAULT_REALTIME_INSTRUCTIONS
+    assert "Do not infer unstated reasoning" in DEFAULT_REALTIME_INSTRUCTIONS
+    assert "Do not complete, improve, or clean up a partial answer" in (
+        DEFAULT_REALTIME_INSTRUCTIONS
+    )
+    assert "Do not turn a short idea into a fully reasoned explanation" in (
+        DEFAULT_REALTIME_INSTRUCTIONS
+    )
+    assert "Ask them to explain why or how" in DEFAULT_REALTIME_INSTRUCTIONS
+    assert "Prefer probing over explaining" in DEFAULT_REALTIME_INSTRUCTIONS
+    assert "### Voice Mode Behavior" in DEFAULT_REALTIME_INSTRUCTIONS
+    assert "### Intervention Policy" in DEFAULT_REALTIME_INSTRUCTIONS
 
 
 def test_get_settings_defaults_to_gpt_realtime_mini(monkeypatch) -> None:
     monkeypatch.delenv("OPENAI_REALTIME_MODEL", raising=False)
+    monkeypatch.delenv("MAX_INTERVIEW_SECONDS", raising=False)
 
     settings = get_settings()
 
     assert settings.openai_realtime_model == "gpt-realtime-mini"
+    assert settings.max_interview_seconds == 2400
     assert settings.realtime_pricing.model == "gpt-realtime-mini"
     assert settings.realtime_pricing.text_input_per_million_tokens == 0.60
     assert settings.realtime_pricing.text_cached_input_per_million_tokens == 0.06
@@ -62,4 +79,9 @@ def test_default_realtime_instructions_includes_proactive_tool_usage() -> None:
     assert "### Tool Usage" in DEFAULT_REALTIME_INSTRUCTIONS
     assert "get_current_code_context" in DEFAULT_REALTIME_INSTRUCTIONS
     assert "proactively" in DEFAULT_REALTIME_INSTRUCTIONS
-    assert "approach planning" in DEFAULT_REALTIME_INSTRUCTIONS
+    assert "planning, implementation, debugging, and optimization" in (
+        DEFAULT_REALTIME_INSTRUCTIONS
+    )
+    assert "If there is any reasonable chance the candidate has written or changed code" in (
+        DEFAULT_REALTIME_INSTRUCTIONS
+    )
