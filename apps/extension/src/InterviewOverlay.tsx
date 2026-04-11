@@ -27,6 +27,7 @@ import {
 } from "./overlay-ui";
 import { computePopoverPlacement } from "./popover-placement";
 import { applyProblemSyncResult } from "./problem-session-sync";
+import { authClient } from "./auth";
 import { fetchClientSecret, RealtimeSession } from "./realtime-session";
 import {
   closePanel as closeShellPanel,
@@ -155,6 +156,7 @@ export const startInterviewSessionAttempt = async ({
   captureLatestCodeSnapshot: captureLatestCodeSnapshotImpl,
   fetchClientSecret: fetchClientSecretImpl,
   createRealtimeSession,
+  getAuthHeader,
   apiBaseUrl,
   locationHref,
   problem,
@@ -163,6 +165,7 @@ export const startInterviewSessionAttempt = async ({
   captureLatestCodeSnapshot: typeof captureLatestCodeSnapshot;
   fetchClientSecret: typeof fetchClientSecret;
   createRealtimeSession: () => RealtimeSession | { start: RealtimeSession["start"] };
+  getAuthHeader: () => Promise<{ Authorization: string }>;
   apiBaseUrl: string;
   locationHref: string;
   problem: LeetCodeProblem | null;
@@ -170,9 +173,11 @@ export const startInterviewSessionAttempt = async ({
 }) => {
   await captureLatestCodeSnapshotImpl().catch(() => ({ snapshot: null }));
 
+  const authHeader = await getAuthHeader();
   const secret = await fetchClientSecretImpl(
     apiBaseUrl,
-    buildProblemPayloadForBackend(problem, new URL(locationHref))
+    buildProblemPayloadForBackend(problem, new URL(locationHref)),
+    authHeader
   );
   const session = createRealtimeSession();
   await session.start(secret.value, secret.session.model);
@@ -515,6 +520,7 @@ export const InterviewOverlay = () => {
           captureLatestCodeSnapshot,
           fetchClientSecret,
           createRealtimeSession: () => new RealtimeSession(),
+          getAuthHeader: () => authClient.getAuthHeader(),
           apiBaseUrl: API_BASE_URL,
           locationHref: window.location.href,
           problem

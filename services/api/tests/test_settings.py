@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from app.core.settings import DEFAULT_REALTIME_INSTRUCTIONS, get_settings
 
 
@@ -75,6 +77,8 @@ def test_get_settings_allows_env_overrides_for_model_and_pricing(monkeypatch) ->
     assert settings.realtime_pricing.audio_output_per_million_tokens == 9.87
     assert settings.realtime_pricing.image_input_per_million_tokens == 6.54
     assert settings.realtime_pricing.image_cached_input_per_million_tokens == 0.65
+
+
 def test_default_realtime_instructions_includes_proactive_tool_usage() -> None:
     assert "### Tool Usage" in DEFAULT_REALTIME_INSTRUCTIONS
     assert "get_current_code_context" in DEFAULT_REALTIME_INSTRUCTIONS
@@ -85,3 +89,22 @@ def test_default_realtime_instructions_includes_proactive_tool_usage() -> None:
     assert "If there is any reasonable chance the candidate has written or changed code" in (
         DEFAULT_REALTIME_INSTRUCTIONS
     )
+    assert "approach planning" in DEFAULT_REALTIME_INSTRUCTIONS
+
+
+def test_get_settings_supabase_defaults_to_none() -> None:
+    for var in ("SUPABASE_URL", "SUPABASE_SECRET_KEY"):
+        os.environ.pop(var, None)
+
+    settings = get_settings()
+    assert settings.supabase_url is None
+    assert settings.supabase_secret_key is None
+
+
+def test_get_settings_reads_supabase_env_vars(monkeypatch) -> None:
+    monkeypatch.setenv("SUPABASE_URL", "https://test.supabase.co")
+    monkeypatch.setenv("SUPABASE_SECRET_KEY", "secret-key")
+
+    settings = get_settings()
+    assert settings.supabase_url == "https://test.supabase.co"
+    assert settings.supabase_secret_key == "secret-key"

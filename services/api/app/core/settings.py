@@ -196,6 +196,8 @@ class Settings:
     openai_realtime_instructions: str
     max_interview_seconds: int
     realtime_pricing: RealtimePricing
+    supabase_url: str | None
+    supabase_secret_key: str | None
 
 
 def get_settings() -> Settings:
@@ -211,4 +213,6 @@ def get_settings() -> Settings:
         ),
         max_interview_seconds=int(os.getenv("MAX_INTERVIEW_SECONDS", "2400")),
         realtime_pricing=get_realtime_pricing_settings(model=realtime_model),
+        supabase_url=os.getenv("SUPABASE_URL"),
+        supabase_secret_key=os.getenv("SUPABASE_SECRET_KEY"),
     )

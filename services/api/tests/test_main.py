@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 from app.main import create_app
 from fastapi.testclient import TestClient
 
@@ -13,6 +15,28 @@ VALID_REQUEST = {
         "constraints": ["2 <= nums.length <= 10^4"],
     }
 }
+
+# Fake dependencies that bypass auth and DB for tests focused on session logic
+_FAKE_USER_ID = "test-user-id"
+
+
+def _fake_user_id() -> str:
+    return _FAKE_USER_ID
+
+
+def _fake_db() -> MagicMock:
+    db = MagicMock()
+    # Returning user with quota remaining — satisfies _check_and_register_user
+    quota_result = MagicMock()
+    quota_result.data = {"sessions_used": 0}
+    (
+        db.table.return_value
+        .select.return_value
+        .eq.return_value
+        .maybe_single.return_value
+        .execute.return_value
+    ) = quota_result
+    return db
 
 
 def test_health_returns_ok() -> None:
@@ -42,7 +66,11 @@ def test_create_realtime_session_returns_browser_safe_fields_only() -> None:
         created.append({"problem": problem, "payload": payload})
         return payload
 
-    client = TestClient(create_app(create_session=create_session))
+    client = TestClient(create_app(
+        create_session=create_session,
+        get_db=_fake_db,
+        get_user_id=_fake_user_id,
+    ))
 
     response = client.post("/v1/realtime/sessions", json=VALID_REQUEST)
 
@@ -78,7 +106,11 @@ def test_create_realtime_session_creates_a_new_session_per_request() -> None:
             },
         }
 
-    client = TestClient(create_app(create_session=create_session))
+    client = TestClient(create_app(
+        create_session=create_session,
+        get_db=_fake_db,
+        get_user_id=_fake_user_id,
+    ))
 
     first = client.post("/v1/realtime/sessions", json=VALID_REQUEST)
     second = client.post("/v1/realtime/sessions", json=VALID_REQUEST)
@@ -93,7 +125,11 @@ def test_create_realtime_session_hides_upstream_errors() -> None:
     def create_session(problem: object) -> dict[str, object]:
         raise RuntimeError("upstream auth failed with sk-live-secret")
 
-    client = TestClient(create_app(create_session=create_session))
+    client = TestClient(create_app(
+        create_session=create_session,
+        get_db=_fake_db,
+        get_user_id=_fake_user_id,
+    ))
 
     response = client.post("/v1/realtime/sessions", json=VALID_REQUEST)
 
@@ -102,7 +138,10 @@ def test_create_realtime_session_hides_upstream_errors() -> None:
 
 
 def test_create_realtime_session_rejects_missing_problem() -> None:
-    client = TestClient(create_app())
+    client = TestClient(create_app(
+        get_db=_fake_db,
+        get_user_id=_fake_user_id,
+    ))
 
     response = client.post("/v1/realtime/sessions", json={})
 
@@ -110,7 +149,10 @@ def test_create_realtime_session_rejects_missing_problem() -> None:
 
 
 def test_create_realtime_session_rejects_placeholder_problem_content() -> None:
-    client = TestClient(create_app())
+    client = TestClient(create_app(
+        get_db=_fake_db,
+        get_user_id=_fake_user_id,
+    ))
 
     response = client.post(
         "/v1/realtime/sessions",
