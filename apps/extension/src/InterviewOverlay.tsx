@@ -345,6 +345,7 @@ export const InterviewOverlay = () => {
     const syncController = createIdleCodeSyncController({
       capture: async () => {
         await captureLatestCodeSnapshot().catch(() => ({ snapshot: null }));
+        sessionRef.current?.notifyCodeUpdated();
       }
     });
 
