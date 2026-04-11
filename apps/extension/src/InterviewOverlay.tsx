@@ -457,8 +457,12 @@ export const InterviewOverlay = () => {
     };
   }, [state.isPanelExpanded, state.sessionStatus]);
 
-  const openPanel = useCallback(() => {
-    setState((currentState) => openShellPanel(currentState));
+  const togglePanel = useCallback(() => {
+    setState((currentState) =>
+      currentState.isPanelExpanded
+        ? closeShellPanel(currentState)
+        : openShellPanel(currentState)
+    );
   }, []);
 
   const handleStart = useCallback(() => {
@@ -575,13 +579,13 @@ export const InterviewOverlay = () => {
         {state.baseControlMode === "launcher" ? (
           <LauncherButton
             isExpanded={state.isPanelExpanded}
-            onClick={openPanel}
+            onClick={togglePanel}
             palette={paletteWithButton}
           />
         ) : (
           <CollapsedToolbar
             onEnd={handleEnd}
-            onExpand={openPanel}
+            onExpand={togglePanel}
             onMuteToggle={handleMuteToggle}
             pageTone={pageTone}
             state={state}

@@ -1,4 +1,4 @@
-import { forwardRef, type CSSProperties } from "react";
+import { forwardRef, useState, type CSSProperties } from "react";
 
 import { AppIcon } from "./AppIcon";
 import type { LeetCodeProblem } from "./leetcode-page";
@@ -55,7 +55,7 @@ const ExpandIcon = ({ size = 16 }: { size?: number }) => (
   </svg>
 );
 
-const MicIcon = ({ isMuted, size = 18 }: { isMuted: boolean; size?: number }) => (
+const MicIcon = ({ isMuted, size = 16 }: { isMuted: boolean; size?: number }) => (
   <span
     aria-hidden="true"
     data-icon={isMuted ? "mic-off" : "mic-on"}
@@ -64,15 +64,50 @@ const MicIcon = ({ isMuted, size = 18 }: { isMuted: boolean; size?: number }) =>
       <svg
         fill="none"
         height={size}
-        viewBox="0 0 14 14"
+        viewBox="0 0 24 24"
         width={size}
         xmlns="http://www.w3.org/2000/svg">
-        <path
-          d="M9.92 8.08A3.5 3.5 0 0 1 4.1 4.63M5.83 11.08h2.34M7 9.92v1.16M10.5 6.42a3.5 3.5 0 0 1-5.98 2.06M2.92 6.42a4.08 4.08 0 0 0 7.5 2.2M7 1.75a1.75 1.75 0 0 1 1.75 1.75v1.47M2.33 2.33l9.34 9.34"
+        <rect
+          height="12"
+          rx="3"
           stroke="currentColor"
           strokeLinecap="round"
           strokeLinejoin="round"
-          strokeWidth="1.2"
+          strokeWidth="2"
+          width="6"
+          x="9"
+          y="2"
+        />
+        <path
+          d="M5 10v2a7 7 0 0 0 14 0v-2"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+        />
+        <path
+          d="M12 19v3"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+        />
+        <path
+          d="M8 22h8"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+        />
+        <line
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+          x1="3"
+          x2="21"
+          y1="3"
+          y2="21"
         />
       </svg>
     ) : (
@@ -136,27 +171,30 @@ export const CollapsedToolbar = ({
   onEnd: () => void;
   onExpand: () => void;
 }) => {
+  const [hoveredControl, setHoveredControl] = useState<
+    "mute" | "end" | "expand" | null
+  >(null);
   const tp =
     pageTone === "dark"
       ? {
-          container: "transparent",
-          border: "transparent",
-          text: "rgba(226, 232, 240, 0.82)",
-          timer: "#5eead4",
-          btnBg: "transparent",
-          endBg: "transparent",
-          endText: "#fca5a5",
-          divider: "rgba(148, 163, 184, 0.24)"
+          container: "rgba(24, 24, 24, 0.94)",
+          text: "#f4f4f5",
+          timer: "#fd9000",
+          btnBg: "rgba(255, 255, 255, 0.05)",
+          endBg: "rgba(255, 255, 255, 0.05)",
+          endText: "#fa423d",
+          divider: "rgba(255, 255, 255, 0.1)",
+          shadow: "0 10px 24px rgba(0, 0, 0, 0.16)"
         }
       : {
-          container: "transparent",
-          border: "transparent",
-          text: "rgba(71, 85, 105, 0.88)",
-          timer: "#0f766e",
-          btnBg: "transparent",
-          endBg: "transparent",
-          endText: "#dc2626",
-          divider: "rgba(100, 116, 139, 0.22)"
+          container: "rgba(255, 255, 255, 0.92)",
+          text: "#18181b",
+          timer: "#9e00b4",
+          btnBg: "rgba(15, 23, 42, 0.05)",
+          endBg: "rgba(15, 23, 42, 0.05)",
+          endText: "#fa423d",
+          divider: "rgba(24, 24, 27, 0.1)",
+          shadow: "0 10px 24px rgba(15, 23, 42, 0.08)"
         };
 
   return (
@@ -165,9 +203,15 @@ export const CollapsedToolbar = ({
       style={{
         ...styles.collapsedToolbar,
         background: tp.container,
-        borderColor: tp.border,
-        color: tp.text
+        color: tp.text,
+        boxShadow: tp.shadow
       }}>
+      <span
+        style={{ ...styles.loopChip, color: tp.text }}
+        aria-label="Loop"
+        role="img">
+        <AppIcon decorative size={22} />
+      </span>
       <span
         aria-label={statusLabel}
         role="status"
@@ -185,21 +229,39 @@ export const CollapsedToolbar = ({
       <button
         aria-label={getMicLabel(state.isMuted)}
         onClick={onMuteToggle}
-        style={{ ...styles.iconBtn, background: tp.btnBg, color: tp.text }}
+        onMouseEnter={() => setHoveredControl("mute")}
+        onMouseLeave={() => setHoveredControl(null)}
+        style={{
+          ...styles.iconBtn,
+          background: hoveredControl === "mute" ? tp.btnBg : "transparent",
+          color: tp.text
+        }}
         type="button">
-        <MicIcon isMuted={state.isMuted} />
+        <MicIcon isMuted={state.isMuted} size={14} />
       </button>
       <button
         aria-label="End session"
         onClick={onEnd}
-        style={{ ...styles.endBtn, background: tp.endBg, color: tp.endText }}
+        onMouseEnter={() => setHoveredControl("end")}
+        onMouseLeave={() => setHoveredControl(null)}
+        style={{
+          ...styles.endBtn,
+          background: hoveredControl === "end" ? tp.endBg : "transparent",
+          color: tp.endText
+        }}
         type="button">
         End
       </button>
       <button
         aria-label="Expand interviewer panel"
         onClick={onExpand}
-        style={{ ...styles.iconBtn, background: tp.btnBg, color: tp.text }}
+        onMouseEnter={() => setHoveredControl("expand")}
+        onMouseLeave={() => setHoveredControl(null)}
+        style={{
+          ...styles.iconBtn,
+          background: hoveredControl === "expand" ? tp.btnBg : "transparent",
+          color: tp.text
+        }}
         type="button">
         <ExpandIcon />
       </button>
@@ -387,37 +449,47 @@ export const ExpandedPanel = forwardRef<
 
 const styles: Record<string, CSSProperties> = {
   collapsedToolbar: {
-    display: "flex",
+    display: "inline-flex",
     alignItems: "center",
     gap: "4px",
-    height: "36px",
-    padding: 0,
-    borderRadius: "8px",
-    background: "transparent",
+    minHeight: "38px",
+    padding: "4px",
+    borderRadius: "11px",
     border: "none",
     color: "#e5e7eb",
-    whiteSpace: "nowrap"
+    whiteSpace: "nowrap",
+    boxSizing: "border-box"
+  },
+  loopChip: {
+    minWidth: "30px",
+    minHeight: "30px",
+    padding: 0,
+    borderRadius: "8px",
+    display: "grid",
+    placeItems: "center",
+    boxSizing: "border-box"
   },
   collapsedTimer: {
-    fontSize: "13px",
+    fontSize: "12px",
     fontWeight: 600,
     fontVariantNumeric: "tabular-nums",
     letterSpacing: "-0.02em",
     color: "#e5e7eb",
     minWidth: "38px",
-    padding: "0 4px"
+    padding: "0 6px",
+    lineHeight: 1
   },
   toolbarDivider: {
     width: "1px",
-    height: "14px",
+    height: "16px",
     background: "rgba(255, 255, 255, 0.15)",
     flexShrink: 0,
     margin: "0 2px"
   },
   iconBtn: {
-    width: "26px",
-    height: "26px",
-    borderRadius: "999px",
+    width: "30px",
+    height: "30px",
+    borderRadius: "8px",
     border: "none",
     background: "transparent",
     color: "#e5e7eb",
@@ -429,16 +501,18 @@ const styles: Record<string, CSSProperties> = {
     padding: 0
   },
   endBtn: {
-    height: "26px",
-    padding: "0 8px",
-    borderRadius: "999px",
+    minWidth: "30px",
+    height: "30px",
+    padding: "0 10px",
+    borderRadius: "8px",
     border: "none",
     background: "transparent",
     color: "#f87171",
     fontSize: "11px",
-    fontWeight: 700,
+    fontWeight: 600,
     cursor: "pointer",
-    flexShrink: 0
+    flexShrink: 0,
+    boxSizing: "border-box"
   },
   micIcon: {
     display: "inline-flex",
