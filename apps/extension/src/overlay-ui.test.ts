@@ -42,13 +42,15 @@ describe("overlay ui", () => {
     expect(html).toContain("aria-label=\"End session\"");
     expect(html).toContain("aria-label=\"Expand interviewer panel\"");
     expect(html).toContain("data-icon=\"mic-on\"");
+    expect(html).toContain("aria-label=\"Loop\"");
+    expect(html).toContain("data-app-icon=\"true\"");
     expect(html).toContain(">02:05<");
-    expect(html).toContain("height:36px");
-    expect(html).toContain("padding:0");
+    expect(html).toContain("min-height:38px");
+    expect(html).toContain("padding:4px");
     expect(html).toContain("border:none");
   });
 
-  it("renders the collapsed toolbar with flat inline chrome and branded timer emphasis", () => {
+  it("renders the collapsed toolbar with branded single-surface chrome", () => {
     const html = renderToStaticMarkup(
       createElement(CollapsedToolbar, {
         state: baseState,
@@ -61,9 +63,12 @@ describe("overlay ui", () => {
       })
     );
 
+    expect(html).toContain("background:rgba(24, 24, 24, 0.94)");
+    expect(html).toContain("color:#fd9000");
+    expect(html).toContain("border-radius:11px");
+    expect(html).toContain("border-radius:8px");
+    expect(html).toContain("color:#fa423d");
     expect(html).toContain("background:transparent");
-    expect(html).toContain("color:#5eead4");
-    expect(html).toContain("border-radius:999px");
     expect(html).toContain("data-icon=\"mic-on\"");
   });
 
@@ -95,18 +100,19 @@ describe("overlay ui", () => {
           ...baseState,
           isPanelExpanded: true
         },
-        pageTone: "dark",
-        problemDifficultyColor: "#4ade80",
         palette: {
           panelBackground: "#0f172a",
           panelBorder: "#334155",
           panelText: "#e2e8f0",
           subtleText: "#94a3b8",
+          divider: "rgba(255,255,255,0.05)",
           timerBackground: "#111827",
           secondaryBackground: "#1e293b",
           secondaryBorder: "#475569",
           utilityBackground: "#1d4ed8",
-          utilityText: "#dbeafe"
+          utilityText: "#dbeafe",
+          primaryBackground: "#f8fafc",
+          primaryText: "#0f172a"
         },
         popoverTop: 48,
         popoverLeft: 64,
@@ -123,17 +129,22 @@ describe("overlay ui", () => {
     );
 
     expect(html).toContain("Loop");
-    expect(html).toContain("Interviewer");
     expect(html).toContain("data-app-icon=\"true\"");
+    expect(html).toContain(">Status<");
+    expect(html).toContain(">Problem<");
+    expect(html).toContain(">Time remaining<");
     expect(html).toContain("Two Sum");
+    expect(html).not.toContain("Easy");
     expect(html).toContain("aria-label=\"Session connected\"");
     expect(html).toContain("left:64px");
     expect(html).toContain("top:48px");
     expect(html).toContain(">End<");
-    expect(html).toContain(">Mute mic<");
+    expect(html).toContain(">Start<");
+    expect(html).toContain("aria-label=\"Mute microphone\"");
+    expect(html).toContain("width:284px");
   });
 
-  it("keeps the collapsed toolbar free of branding artwork", () => {
+  it("renders branding artwork only inside the collapsed loop chip", () => {
     const html = renderToStaticMarkup(
       createElement(CollapsedToolbar, {
         state: baseState,
@@ -146,6 +157,6 @@ describe("overlay ui", () => {
       })
     );
 
-    expect(html).not.toContain("data-app-icon=\"true\"");
+    expect(html).toContain("data-app-icon=\"true\"");
   });
 });
