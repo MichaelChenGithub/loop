@@ -104,4 +104,24 @@ describe("applyProblemSyncResult", () => {
     ).toBe(false);
   });
 
+  it("resets an active session back to idle when the problem changes", () => {
+    const sessionEnd = vi.fn();
+    const setState = vi.fn();
+
+    applyProblemSyncResult({
+      nextProblem: problem("add-two-numbers"),
+      previousProblemRef: { current: problem("two-sum") },
+      previousSlugRef: { current: "two-sum" },
+      sessionRef: { current: { end: sessionEnd } },
+      setProblem: vi.fn(),
+      setState,
+      resetSessionState: (currentState) => currentState,
+      getState: () =>
+        confirmConnected(startSession(createInitialInterviewShellState()), 60)
+    });
+
+    expect(sessionEnd).toHaveBeenCalledTimes(1);
+    expect(setState).toHaveBeenCalledTimes(1);
+  });
+
 });

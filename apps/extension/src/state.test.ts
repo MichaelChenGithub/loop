@@ -7,6 +7,7 @@ import {
   createInitialInterviewShellState,
   endSession,
   openPanel,
+  resetSession,
   sessionFailed,
   startSession,
   tickTimer,
@@ -73,6 +74,17 @@ describe("interview shell state", () => {
     expect(failedState.remainingSeconds).toBe(0);
     expect(failedState.baseControlMode).toBe("launcher");
     expect(failedState.isPanelExpanded).toBe(true);
+  });
+
+  it("resets a connected session back to idle without leaving the shell in ended state", () => {
+    const resetState = resetSession(
+      confirmConnected(startSession(createInitialInterviewShellState()), 120)
+    );
+
+    expect(resetState.sessionStatus).toBe("idle");
+    expect(resetState.remainingSeconds).toBe(0);
+    expect(resetState.baseControlMode).toBe("launcher");
+    expect(resetState.isPanelExpanded).toBe(true);
   });
 
   it("counts down the timer each tick while connected", () => {

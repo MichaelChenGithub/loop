@@ -35,6 +35,7 @@ import {
   endSession,
   openPanel as openShellPanel,
   sessionFailed,
+  resetSession,
   startSession,
   tickTimer,
   toggleMute,
@@ -299,7 +300,7 @@ export const InterviewOverlay = () => {
         sessionRef,
         setProblem,
         setState,
-        resetSessionState: endSession,
+        resetSessionState: resetSession,
         getState: () => stateRef.current
       });
 
