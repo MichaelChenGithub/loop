@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CAPTURE_LATEST_CODE_SNAPSHOT_MESSAGE_TYPE,
   GET_LATEST_CODE_SNAPSHOT_MESSAGE_TYPE,
-  READ_LATEST_CODE_SNAPSHOT_FROM_PAGE_MESSAGE_TYPE,
   type LatestCodeSnapshot
 } from "../code-snapshot";
 import {
@@ -95,17 +94,20 @@ describe("installBackgroundMessageHandlers", () => {
     vi.restoreAllMocks();
   });
 
-  it("requests a one-time page snapshot and stores it", async () => {
+  it("uses executeScript MAIN world result to capture full Monaco model value", async () => {
     const addListener = vi.fn();
-    const sendPageMessage = vi
-      .fn()
-      .mockResolvedValue(makeSnapshot("print('captured')"));
+    const captureSnapshotFromMainWorld = vi.fn().mockResolvedValue({
+      code: "print('captured')",
+      language: "python3",
+      problemSlug: "two-sum"
+    });
 
     installBackgroundMessageHandlers({
       runtime: {
         onMessage: { addListener }
       } as never,
-      sendPageMessage
+      captureSnapshotFromMainWorld,
+      getNowIsoString: () => "2026-04-10T15:30:00.000Z"
     });
 
     const listener = addListener.mock.calls[0]?.[0];
@@ -123,16 +125,52 @@ describe("installBackgroundMessageHandlers", () => {
       });
     });
 
-    expect(sendPageMessage).toHaveBeenCalledWith(12, {
-      type: READ_LATEST_CODE_SNAPSHOT_FROM_PAGE_MESSAGE_TYPE
-    });
+    expect(captureSnapshotFromMainWorld).toHaveBeenCalledWith(12);
     expect(keepChannelOpen).toBe(true);
     expect(getLatestCodeSnapshot()).toEqual(makeSnapshot("print('captured')"));
   });
 
-  it("does not corrupt the stored snapshot when page extraction returns null", async () => {
+  it("captures the full code without truncation when Monaco model returns many lines", async () => {
     const addListener = vi.fn();
-    const sendPageMessage = vi.fn().mockResolvedValue(null);
+    // Regression: the old DOM textarea/view-lines approach only captured partial
+    // visible content. The new approach reads Monaco model.getValue() which always
+    // returns the complete source regardless of viewport or scroll position.
+    const fullCode = Array.from({ length: 50 }, (_, i) => `    line_${i} = ${i}`).join("\n");
+    const captureSnapshotFromMainWorld = vi.fn().mockResolvedValue({
+      code: fullCode,
+      language: "python3",
+      problemSlug: "minimum-distance"
+    });
+
+    installBackgroundMessageHandlers({
+      runtime: {
+        onMessage: { addListener }
+      } as never,
+      captureSnapshotFromMainWorld,
+      getNowIsoString: () => "2026-04-10T15:30:00.000Z"
+    });
+
+    const listener = addListener.mock.calls[0]?.[0];
+    const sendResponse = vi.fn();
+
+    listener(
+      { type: CAPTURE_LATEST_CODE_SNAPSHOT_MESSAGE_TYPE },
+      { tab: { id: 99 } },
+      sendResponse
+    );
+
+    await vi.waitFor(() => {
+      expect(sendResponse).toHaveBeenCalled();
+    });
+
+    const stored = getLatestCodeSnapshot();
+    expect(stored?.code).toBe(fullCode);
+    expect(stored?.code.split("\n")).toHaveLength(50);
+  });
+
+  it("does not corrupt the stored snapshot when Monaco extraction returns null", async () => {
+    const addListener = vi.fn();
+    const captureSnapshotFromMainWorld = vi.fn().mockResolvedValue(null);
     const existingSnapshot = makeSnapshot("print('existing')");
     setLatestCodeSnapshot(existingSnapshot);
 
@@ -140,7 +178,7 @@ describe("installBackgroundMessageHandlers", () => {
       runtime: {
         onMessage: { addListener }
       } as never,
-      sendPageMessage
+      captureSnapshotFromMainWorld
     });
 
     const listener = addListener.mock.calls[0]?.[0];
@@ -207,14 +245,14 @@ describe("installBackgroundMessageHandlers", () => {
 
   it("returns null through the read-only background message when no snapshot exists", () => {
     const addListener = vi.fn();
-    const sendPageMessage = vi.fn();
+    const captureSnapshotFromMainWorld = vi.fn();
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     installBackgroundMessageHandlers({
       runtime: {
         onMessage: { addListener }
       } as never,
-      sendPageMessage
+      captureSnapshotFromMainWorld
     });
 
     const listener = addListener.mock.calls[0]?.[0];
@@ -230,7 +268,7 @@ describe("installBackgroundMessageHandlers", () => {
     expect(sendResponse).toHaveBeenCalledWith({
       snapshot: null
     });
-    expect(sendPageMessage).not.toHaveBeenCalled();
+    expect(captureSnapshotFromMainWorld).not.toHaveBeenCalled();
     expect(logSpy).toHaveBeenNthCalledWith(1, "[loop] Realtime tool call", {
       tool: "get_current_code_context",
       available: false,
