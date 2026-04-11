@@ -20,15 +20,18 @@ import { createIdleCodeSyncController } from "./code-sync-policy";
 import { captureLatestCodeSnapshot } from "./code-snapshot-runtime";
 import { shouldShowCodeCaptureDebugAction } from "./debug-controls";
 import {
+  BetaFullScreen,
   CollapsedToolbar,
   ExpandedPanel,
+  NoQuotaScreen,
+  SignInScreen,
   type OverlayPalette,
   type PageTone
 } from "./overlay-ui";
 import { computePopoverPlacement } from "./popover-placement";
 import { applyProblemSyncResult } from "./problem-session-sync";
 import { authClient } from "./auth";
-import { fetchClientSecret, RealtimeSession } from "./realtime-session";
+import { fetchClientSecret, RealtimeSession, SessionBrokerError } from "./realtime-session";
 import {
   closePanel as closeShellPanel,
   confirmConnected,
@@ -215,10 +218,13 @@ export const LauncherButton = ({
   </button>
 );
 
+type AuthStatus = "checking" | "signed_out" | "signed_in" | "beta_full" | "no_quota";
+
 export const InterviewOverlay = () => {
   const [isVisible, setIsVisible] = useState(() =>
     shouldMountInterviewOverlay(new URL(window.location.href), document)
   );
+  const [authStatus, setAuthStatus] = useState<AuthStatus>("checking");
   const [state, setState] = useState(createInitialInterviewShellState);
   const [anchor, setAnchor] = useState<ToolbarAnchorResult>(() =>
     resolveToolbarAnchor(document, getViewport())
@@ -247,6 +253,12 @@ export const InterviewOverlay = () => {
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
+
+  useEffect(() => {
+    authClient.getSession()
+      .then(session => setAuthStatus(session ? "signed_in" : "signed_out"))
+      .catch(() => setAuthStatus("signed_out"));
+  }, []);
 
   useEffect(() => {
     let rafId = 0;
@@ -491,6 +503,17 @@ export const InterviewOverlay = () => {
     };
   }, [state.isPanelExpanded, state.sessionStatus]);
 
+  const handleSignIn = useCallback(() => {
+    void (async () => {
+      try {
+        await authClient.signInWithGoogle();
+        setAuthStatus("signed_in");
+      } catch {
+        // flow cancelled or failed — stay on sign-in screen
+      }
+    })();
+  }, []);
+
   const togglePanel = useCallback(() => {
     setState((currentState) =>
       currentState.isPanelExpanded
@@ -537,9 +560,14 @@ export const InterviewOverlay = () => {
         setState((currentState) =>
           confirmConnected(currentState, remainingSeconds)
         );
-      } catch {
+      } catch (err) {
         if (sessionGenerationRef.current !== sessionGeneration) {
           return;
+        }
+
+        if (err instanceof SessionBrokerError) {
+          if (err.code === "beta_full") { setAuthStatus("beta_full"); return; }
+          if (err.code === "no_quota")  { setAuthStatus("no_quota");  return; }
         }
 
         sessionRef.current = null;
@@ -610,15 +638,52 @@ export const InterviewOverlay = () => {
   const showCodeCaptureDebugAction = shouldShowCodeCaptureDebugAction();
   const statusLabel = getConnectionLabel(state.sessionStatus);
   const timerText = formatTime(state.remainingSeconds);
+  const isTimerWarning =
+    state.sessionStatus === "connected" && state.remainingSeconds <= 300;
   const paletteWithButton = palette as OverlayPalette & {
     buttonBackground: string;
     buttonBorder: string;
     buttonText: string;
   };
 
-  if (!isVisible) {
+  if (!isVisible || authStatus === "checking") {
     return null;
   }
+
+  const gateScreenProps = {
+    palette,
+    popoverTop: popoverPlacement.top,
+    popoverLeft: popoverPlacement.left,
+    transformOrigin: popoverPlacement.transformOrigin
+  };
+
+  const renderPopover = () => {
+    if (!state.isPanelExpanded) return null;
+    if (authStatus === "signed_out") return <SignInScreen {...gateScreenProps} onSignIn={handleSignIn} />;
+    if (authStatus === "beta_full")  return <BetaFullScreen {...gateScreenProps} />;
+    if (authStatus === "no_quota")   return <NoQuotaScreen {...gateScreenProps} />;
+    return (
+      <ExpandedPanel
+        ref={popoverRef}
+        isStartDisabled={isStartDisabled}
+        isTimerWarning={isTimerWarning}
+        onCaptureCode={handleCaptureCode}
+        onClose={() => setState((currentState) => closeShellPanel(currentState))}
+        onEnd={handleEnd}
+        onMuteToggle={handleMuteToggle}
+        onStart={handleStart}
+        palette={palette}
+        popoverLeft={popoverPlacement.left}
+        popoverTop={popoverPlacement.top}
+        problem={problem}
+        showCodeCaptureDebugAction={showCodeCaptureDebugAction}
+        state={state}
+        statusLabel={statusLabel}
+        timerText={timerText}
+        transformOrigin={popoverPlacement.transformOrigin}
+      />
+    );
+  };
 
   return (
     <div style={styles.host}>
@@ -635,6 +700,7 @@ export const InterviewOverlay = () => {
           />
         ) : (
           <CollapsedToolbar
+            isTimerWarning={isTimerWarning}
             onEnd={handleEnd}
             onExpand={togglePanel}
             onMuteToggle={handleMuteToggle}
@@ -646,26 +712,7 @@ export const InterviewOverlay = () => {
         )}
       </div>
 
-      {state.isPanelExpanded ? (
-        <ExpandedPanel
-          ref={popoverRef}
-          isStartDisabled={isStartDisabled}
-          onCaptureCode={handleCaptureCode}
-          onClose={() => setState((currentState) => closeShellPanel(currentState))}
-          onEnd={handleEnd}
-          onMuteToggle={handleMuteToggle}
-          onStart={handleStart}
-          palette={palette}
-          popoverLeft={popoverPlacement.left}
-          popoverTop={popoverPlacement.top}
-          problem={problem}
-          showCodeCaptureDebugAction={showCodeCaptureDebugAction}
-          state={state}
-          statusLabel={statusLabel}
-          timerText={timerText}
-          transformOrigin={popoverPlacement.transformOrigin}
-        />
-      ) : null}
+      {renderPopover()}
     </div>
   );
 };

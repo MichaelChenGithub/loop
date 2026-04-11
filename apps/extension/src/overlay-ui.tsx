@@ -4,6 +4,9 @@ import { AppIcon } from "./AppIcon";
 import type { LeetCodeProblem } from "./leetcode-page";
 import type { InterviewShellState } from "./state";
 
+const CONTACT_EMAIL = process.env.PLASMO_PUBLIC_CONTACT_EMAIL ?? "";
+const TIMER_WARNING_COLOR = "#f87171";
+
 export type PageTone = "dark" | "light";
 
 export type OverlayPalette = {
@@ -159,6 +162,7 @@ export const CollapsedToolbar = ({
   pageTone,
   timerText,
   statusLabel,
+  isTimerWarning = false,
   onMuteToggle,
   onEnd,
   onExpand
@@ -167,6 +171,7 @@ export const CollapsedToolbar = ({
   pageTone: PageTone;
   timerText: string;
   statusLabel: string;
+  isTimerWarning?: boolean;
   onMuteToggle: () => void;
   onEnd: () => void;
   onExpand: () => void;
@@ -222,7 +227,10 @@ export const CollapsedToolbar = ({
       />
       <strong
         aria-label="Time remaining"
-        style={{ ...styles.collapsedTimer, color: tp.timer }}>
+        style={{
+          ...styles.collapsedTimer,
+          color: isTimerWarning ? TIMER_WARNING_COLOR : tp.timer
+        }}>
         {timerText}
       </strong>
       <span style={{ ...styles.toolbarDivider, background: tp.divider }} />
@@ -280,6 +288,7 @@ export const ExpandedPanel = forwardRef<
     transformOrigin: string;
     timerText: string;
     statusLabel: string;
+    isTimerWarning?: boolean;
     onClose: () => void;
     onStart: () => void;
     onEnd: () => void;
@@ -299,6 +308,7 @@ export const ExpandedPanel = forwardRef<
       transformOrigin,
       timerText,
       statusLabel,
+      isTimerWarning = false,
       onClose,
       onStart,
       onEnd,
@@ -381,7 +391,13 @@ export const ExpandedPanel = forwardRef<
             ...styles.timerRow,
             background: palette.timerBackground
           }}>
-          <strong style={styles.timerValue}>{timerText}</strong>
+          <strong
+            style={{
+              ...styles.timerValue,
+              color: isTimerWarning ? TIMER_WARNING_COLOR : undefined
+            }}>
+            {timerText}
+          </strong>
           <span
             aria-hidden="true"
             style={{ ...styles.timerAccent, background: palette.utilityText }}
@@ -446,6 +462,138 @@ export const ExpandedPanel = forwardRef<
     ) : null}
   </section>
 ));
+
+// ---------------------------------------------------------------------------
+// Auth gate screens — shared popover shell, swapped content
+// ---------------------------------------------------------------------------
+
+type GateScreenProps = {
+  palette: OverlayPalette;
+  popoverTop: number;
+  popoverLeft: number;
+  transformOrigin: string;
+};
+
+export const SignInScreen = ({
+  palette,
+  popoverTop,
+  popoverLeft,
+  transformOrigin,
+  onSignIn
+}: GateScreenProps & { onSignIn: () => void }) => (
+  <section
+    aria-label="Loop sign in"
+    style={{
+      ...styles.popover,
+      top: `${popoverTop}px`,
+      left: `${popoverLeft}px`,
+      transformOrigin,
+      background: palette.panelBackground,
+      borderColor: palette.panelBorder,
+      color: palette.panelText
+    }}>
+    <div style={styles.headerRow}>
+      <div style={styles.brandBlock}>
+        <AppIcon decorative size={22} style={styles.brandIcon} />
+        <h2 style={styles.brandTitle}>Loop</h2>
+      </div>
+    </div>
+    <div style={styles.gateBody}>
+      <p style={{ ...styles.gateMessage, color: palette.subtleText }}>
+        Sign in to start your free interview sessions.
+      </p>
+      <button
+        onClick={onSignIn}
+        style={{
+          ...styles.primaryButton,
+          ...styles.gateButton,
+          background: palette.primaryBackground,
+          color: palette.primaryText
+        }}
+        type="button">
+        Sign in with Google
+      </button>
+    </div>
+  </section>
+);
+
+export const BetaFullScreen = ({
+  palette,
+  popoverTop,
+  popoverLeft,
+  transformOrigin
+}: GateScreenProps) => (
+  <section
+    aria-label="Loop beta full"
+    style={{
+      ...styles.popover,
+      top: `${popoverTop}px`,
+      left: `${popoverLeft}px`,
+      transformOrigin,
+      background: palette.panelBackground,
+      borderColor: palette.panelBorder,
+      color: palette.panelText
+    }}>
+    <div style={styles.headerRow}>
+      <div style={styles.brandBlock}>
+        <AppIcon decorative size={22} style={styles.brandIcon} />
+        <h2 style={styles.brandTitle}>Loop</h2>
+      </div>
+    </div>
+    <div style={styles.gateBody}>
+      <p style={{ ...styles.gateMessage, color: palette.panelText }}>
+        Beta is full.
+      </p>
+      <p style={{ ...styles.gateSubMessage, color: palette.subtleText }}>
+        We&apos;ve reached our limit for now.
+      </p>
+      <a
+        href={`mailto:${CONTACT_EMAIL}?subject=Loop beta access`}
+        style={{ ...styles.gateLink, color: palette.primaryText, background: palette.primaryBackground }}>
+        Email me to get in →
+      </a>
+    </div>
+  </section>
+);
+
+export const NoQuotaScreen = ({
+  palette,
+  popoverTop,
+  popoverLeft,
+  transformOrigin
+}: GateScreenProps) => (
+  <section
+    aria-label="Loop no quota"
+    style={{
+      ...styles.popover,
+      top: `${popoverTop}px`,
+      left: `${popoverLeft}px`,
+      transformOrigin,
+      background: palette.panelBackground,
+      borderColor: palette.panelBorder,
+      color: palette.panelText
+    }}>
+    <div style={styles.headerRow}>
+      <div style={styles.brandBlock}>
+        <AppIcon decorative size={22} style={styles.brandIcon} />
+        <h2 style={styles.brandTitle}>Loop</h2>
+      </div>
+    </div>
+    <div style={styles.gateBody}>
+      <p style={{ ...styles.gateMessage, color: palette.panelText }}>
+        No sessions remaining.
+      </p>
+      <p style={{ ...styles.gateSubMessage, color: palette.subtleText }}>
+        You&apos;ve used all 3 free sessions.
+      </p>
+      <a
+        href={`mailto:${CONTACT_EMAIL}?subject=Loop more sessions`}
+        style={{ ...styles.gateLink, color: palette.primaryText, background: palette.primaryBackground }}>
+        Email me to get more →
+      </a>
+    </div>
+  </section>
+);
 
 const styles: Record<string, CSSProperties> = {
   collapsedToolbar: {
@@ -663,5 +811,36 @@ const styles: Record<string, CSSProperties> = {
     fontSize: "12px",
     fontWeight: 700,
     cursor: "pointer"
+  },
+  gateBody: {
+    display: "grid",
+    gap: "10px",
+    marginTop: "14px"
+  },
+  gateMessage: {
+    margin: 0,
+    fontSize: "14px",
+    fontWeight: 600,
+    lineHeight: 1.3
+  },
+  gateSubMessage: {
+    margin: 0,
+    fontSize: "12px",
+    lineHeight: 1.4
+  },
+  gateButton: {
+    width: "100%",
+    cursor: "pointer"
+  },
+  gateLink: {
+    display: "block",
+    textAlign: "center",
+    textDecoration: "none",
+    borderRadius: "11px",
+    minHeight: "38px",
+    padding: "0 10px",
+    fontSize: "12px",
+    fontWeight: 600,
+    lineHeight: "38px"
   }
 };
