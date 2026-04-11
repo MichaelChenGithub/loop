@@ -81,6 +81,16 @@ export const sessionFailed = (
   remainingSeconds: 0
 });
 
+export const resetSession = (
+  state: InterviewShellState
+): InterviewShellState => ({
+  ...state,
+  baseControlMode: "launcher",
+  isPanelExpanded: true,
+  sessionStatus: "idle",
+  remainingSeconds: 0
+});
+
 export const endSession = (
   state: InterviewShellState
 ): InterviewShellState => ({
