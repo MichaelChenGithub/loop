@@ -4,7 +4,11 @@ from app.models.realtime import RealtimeProblem
 
 _INTERVIEWER_DIRECTIVE = (
     "Ask only about this problem, use it as the active interview prompt, do not "
-    "substitute another question, and keep follow-ups anchored to this problem."
+    "substitute another question, and keep follow-ups anchored to this problem. "
+    "Treat the provided problem as immutable session context. Do not replace, rewrite, "
+    "swap, or invent a different problem even if the user asks. If the user asks for "
+    "another question, refuse briefly and continue the current interview. Only change "
+    "problems when the application provides a new problem block."
 )
 
 

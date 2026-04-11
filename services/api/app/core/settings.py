@@ -182,22 +182,117 @@ Take a minute to read it, and then walk me through your understanding."
 
 
 @dataclass(frozen=True)
+class RealtimePricing:
+    model: str
+    text_input_per_million_tokens: float
+    text_cached_input_per_million_tokens: float
+    text_output_per_million_tokens: float
+    audio_input_per_million_tokens: float
+    audio_cached_input_per_million_tokens: float
+    audio_output_per_million_tokens: float
+    image_input_per_million_tokens: float
+    image_cached_input_per_million_tokens: float
+
+
+DEFAULT_REALTIME_PRICING_BY_MODEL = {
+    "gpt-realtime-mini": RealtimePricing(
+        model="gpt-realtime-mini",
+        text_input_per_million_tokens=0.60,
+        text_cached_input_per_million_tokens=0.06,
+        text_output_per_million_tokens=2.40,
+        audio_input_per_million_tokens=10.00,
+        audio_cached_input_per_million_tokens=0.30,
+        audio_output_per_million_tokens=20.00,
+        image_input_per_million_tokens=0.80,
+        image_cached_input_per_million_tokens=0.08,
+    ),
+    "gpt-realtime": RealtimePricing(
+        model="gpt-realtime",
+        text_input_per_million_tokens=4.00,
+        text_cached_input_per_million_tokens=0.40,
+        text_output_per_million_tokens=16.00,
+        audio_input_per_million_tokens=32.00,
+        audio_cached_input_per_million_tokens=0.40,
+        audio_output_per_million_tokens=64.00,
+        image_input_per_million_tokens=5.00,
+        image_cached_input_per_million_tokens=0.50,
+    ),
+}
+
+
+def _get_default_realtime_pricing(model: str) -> RealtimePricing:
+    return DEFAULT_REALTIME_PRICING_BY_MODEL.get(
+        model,
+        DEFAULT_REALTIME_PRICING_BY_MODEL["gpt-realtime-mini"],
+    )
+
+
+def _get_float_env(name: str, default: float) -> float:
+    return float(os.getenv(name, str(default)))
+
+
+def get_realtime_pricing_settings(*, model: str) -> RealtimePricing:
+    pricing_model = os.getenv("OPENAI_REALTIME_PRICING_MODEL", model)
+    default_pricing = _get_default_realtime_pricing(pricing_model)
+
+    return RealtimePricing(
+        model=pricing_model,
+        text_input_per_million_tokens=_get_float_env(
+            "OPENAI_REALTIME_TEXT_INPUT_PER_MILLION_TOKENS",
+            default_pricing.text_input_per_million_tokens,
+        ),
+        text_cached_input_per_million_tokens=_get_float_env(
+            "OPENAI_REALTIME_TEXT_CACHED_INPUT_PER_MILLION_TOKENS",
+            default_pricing.text_cached_input_per_million_tokens,
+        ),
+        text_output_per_million_tokens=_get_float_env(
+            "OPENAI_REALTIME_TEXT_OUTPUT_PER_MILLION_TOKENS",
+            default_pricing.text_output_per_million_tokens,
+        ),
+        audio_input_per_million_tokens=_get_float_env(
+            "OPENAI_REALTIME_AUDIO_INPUT_PER_MILLION_TOKENS",
+            default_pricing.audio_input_per_million_tokens,
+        ),
+        audio_cached_input_per_million_tokens=_get_float_env(
+            "OPENAI_REALTIME_AUDIO_CACHED_INPUT_PER_MILLION_TOKENS",
+            default_pricing.audio_cached_input_per_million_tokens,
+        ),
+        audio_output_per_million_tokens=_get_float_env(
+            "OPENAI_REALTIME_AUDIO_OUTPUT_PER_MILLION_TOKENS",
+            default_pricing.audio_output_per_million_tokens,
+        ),
+        image_input_per_million_tokens=_get_float_env(
+            "OPENAI_REALTIME_IMAGE_INPUT_PER_MILLION_TOKENS",
+            default_pricing.image_input_per_million_tokens,
+        ),
+        image_cached_input_per_million_tokens=_get_float_env(
+            "OPENAI_REALTIME_IMAGE_CACHED_INPUT_PER_MILLION_TOKENS",
+            default_pricing.image_cached_input_per_million_tokens,
+        ),
+    )
+
+
+@dataclass(frozen=True)
 class Settings:
     openai_api_key: str | None
     openai_realtime_model: str
     openai_realtime_voice: str
     openai_realtime_instructions: str
     max_interview_seconds: int
+    realtime_pricing: RealtimePricing
 
 
 def get_settings() -> Settings:
+    realtime_model = os.getenv("OPENAI_REALTIME_MODEL", "gpt-realtime-mini")
+
     return Settings(
         openai_api_key=os.getenv("OPENAI_API_KEY"),
-        openai_realtime_model=os.getenv("OPENAI_REALTIME_MODEL", "gpt-realtime"),
+        openai_realtime_model=realtime_model,
         openai_realtime_voice=os.getenv("OPENAI_REALTIME_VOICE", "alloy"),
         openai_realtime_instructions=os.getenv(
             "OPENAI_REALTIME_INSTRUCTIONS",
             DEFAULT_REALTIME_INSTRUCTIONS,
         ),
         max_interview_seconds=int(os.getenv("MAX_INTERVIEW_SECONDS", "600")),
+        realtime_pricing=get_realtime_pricing_settings(model=realtime_model),
     )
