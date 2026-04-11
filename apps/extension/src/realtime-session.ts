@@ -243,20 +243,42 @@ export type ClientSecretResponse = {
   session: { id: string; model: string; object: string; type: string };
 };
 
+export class SessionBrokerError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly code?: string
+  ) {
+    super(
+      `Session broker returned ${status}${code ? `: ${code}` : ""}`
+    );
+  }
+}
+
 export async function fetchClientSecret(
   apiBaseUrl: string,
-  payload: ProblemPayloadForBackend
+  payload: ProblemPayloadForBackend,
+  authHeader: { Authorization: string }
 ): Promise<ClientSecretResponse> {
   const response = await fetch(`${apiBaseUrl}/v1/realtime/sessions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...authHeader,
     },
     body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
-    throw new Error(`Session broker returned ${response.status}`);
+    let code: string | undefined;
+    if (response.status === 403) {
+      try {
+        const body = (await response.json()) as { error?: string };
+        code = body.error;
+      } catch {
+        // ignore parse errors
+      }
+    }
+    throw new SessionBrokerError(response.status, code);
   }
 
   return response.json() as Promise<ClientSecretResponse>;
