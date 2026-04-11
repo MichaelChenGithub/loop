@@ -22,7 +22,7 @@ VALID_REQUEST = RealtimeSessionRequest.model_validate(
 
 
 def _make_broker(
-    max_interview_seconds: int = 600,
+    max_interview_seconds: int = 2400,
 ) -> tuple[RealtimeClientSecretBroker, dict]:
     captured: dict = {}
 
@@ -59,7 +59,7 @@ def _make_broker(
 
 
 def test_broker_posts_backend_owned_defaults_to_openai() -> None:
-    broker, captured = _make_broker(max_interview_seconds=600)
+    broker, captured = _make_broker(max_interview_seconds=2400)
 
     result = broker.create(VALID_REQUEST)
 
@@ -69,7 +69,7 @@ def test_broker_posts_backend_owned_defaults_to_openai() -> None:
     assert captured["method"] == "POST"
     assert captured["url"] == "https://api.openai.com/v1/realtime/client_secrets"
     assert captured["authorization"] == "Bearer sk-test"
-    assert body["expires_after"] == {"anchor": "created_at", "seconds": 600}
+    assert body["expires_after"] == {"anchor": "created_at", "seconds": 2400}
     assert body["session"]["type"] == "realtime"
     assert body["session"]["model"] == "gpt-realtime-2025-08-25"
     assert body["session"]["audio"] == {
@@ -113,7 +113,7 @@ def test_broker_uses_configured_max_interview_seconds() -> None:
 
 
 def test_broker_compiles_full_problem_context_into_instructions() -> None:
-    broker, captured = _make_broker(max_interview_seconds=600)
+    broker, captured = _make_broker(max_interview_seconds=2400)
 
     broker.create(VALID_REQUEST)
 
@@ -128,7 +128,7 @@ def test_broker_compiles_full_problem_context_into_instructions() -> None:
 
 
 def test_broker_prints_compiled_instructions_for_debugging() -> None:
-    broker, _ = _make_broker(max_interview_seconds=600)
+    broker, _ = _make_broker(max_interview_seconds=2400)
 
     with patch("builtins.print") as print_mock:
         broker.create(VALID_REQUEST)
@@ -141,7 +141,7 @@ def test_broker_prints_compiled_instructions_for_debugging() -> None:
 
 
 def test_broker_declares_current_code_context_tool_without_arguments() -> None:
-    broker, captured = _make_broker(max_interview_seconds=600)
+    broker, captured = _make_broker(max_interview_seconds=2400)
 
     broker.create(VALID_REQUEST)
 
