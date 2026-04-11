@@ -7,7 +7,18 @@ import {
 
 const OPENAI_REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
 
-type RealtimeDataChannel = Pick<RTCDataChannel, "send" | "onmessage">;
+type RealtimeClientEvent =
+  | { type: "response.create" }
+  | {
+      type: "conversation.item.create";
+      item: {
+        type: "function_call_output";
+        call_id: string;
+        output: string;
+      };
+    };
+
+type RealtimeDataChannel = Pick<RTCDataChannel, "send" | "onmessage" | "onopen">;
 
 type RealtimeFunctionCallEvent = {
   type: "response.function_call_arguments.done";
@@ -97,6 +108,9 @@ export class RealtimeSession {
     };
 
     this.dataChannel = this.pc.createDataChannel("oai-events");
+    this.dataChannel.onopen = () => {
+      this.sendClientEvent({ type: "response.create" });
+    };
     this.dataChannel.onmessage = (event) => {
       void this.handleDataChannelMessage(event.data);
     };
@@ -135,6 +149,10 @@ export class RealtimeSession {
 
   end(): void {
     this.cleanup();
+  }
+
+  private sendClientEvent(event: RealtimeClientEvent): void {
+    this.dataChannel?.send(JSON.stringify(event));
   }
 
   private cleanup(): void {
@@ -190,16 +208,15 @@ export class RealtimeSession {
       output = { ok: false, error: message };
     }
 
-    this.dataChannel?.send(
-      JSON.stringify({
-        type: "conversation.item.create",
-        item: {
-          type: "function_call_output",
-          call_id: event.call_id,
-          output: JSON.stringify(output)
-        }
-      })
-    );
+    this.sendClientEvent({
+      type: "conversation.item.create",
+      item: {
+        type: "function_call_output",
+        call_id: event.call_id,
+        output: JSON.stringify(output)
+      }
+    });
+    this.sendClientEvent({ type: "response.create" });
   }
 }
 
