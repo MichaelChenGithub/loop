@@ -177,7 +177,7 @@ describe("RealtimeSession.start", () => {
     const close = vi.fn();
     const stop = vi.fn();
     const send = vi.fn();
-    const createDataChannel = vi.fn(() => ({ send, onmessage: null }));
+    const createDataChannel = vi.fn(() => ({ send, onmessage: null, onopen: null }));
     const dispatcher = {
       dispatch: vi.fn().mockResolvedValue({
         available: true,
@@ -241,7 +241,10 @@ describe("RealtimeSession.start", () => {
 
     const dataChannel = createDataChannel.mock.results[0]?.value as {
       onmessage: ((event: { data: string }) => void) | null;
+      onopen: (() => void) | null;
     };
+
+    dataChannel.onopen?.();
 
     dataChannel.onmessage?.({
       data: JSON.stringify({
@@ -257,7 +260,14 @@ describe("RealtimeSession.start", () => {
         name: "get_current_code_context",
         arguments: {}
       });
-      expect(send).toHaveBeenCalledWith(
+      expect(send).toHaveBeenNthCalledWith(
+        1,
+        JSON.stringify({
+          type: "response.create"
+        })
+      );
+      expect(send).toHaveBeenNthCalledWith(
+        2,
         JSON.stringify({
           type: "conversation.item.create",
           item: {
@@ -274,13 +284,19 @@ describe("RealtimeSession.start", () => {
           }
         })
       );
+      expect(send).toHaveBeenNthCalledWith(
+        3,
+        JSON.stringify({
+          type: "response.create"
+        })
+      );
     });
   });
 
   it("keeps the session alive when dispatcher throws during a tool call", async () => {
     const close = vi.fn();
     const send = vi.fn();
-    const createDataChannel = vi.fn(() => ({ send, onmessage: null }));
+    const createDataChannel = vi.fn(() => ({ send, onmessage: null, onopen: null }));
     const dispatcher = {
       dispatch: vi.fn().mockRejectedValue(new Error("boom"))
     };
@@ -337,7 +353,10 @@ describe("RealtimeSession.start", () => {
 
     const dataChannel = createDataChannel.mock.results[0]?.value as {
       onmessage: ((event: { data: string }) => void) | null;
+      onopen: (() => void) | null;
     };
+
+    dataChannel.onopen?.();
 
     dataChannel.onmessage?.({
       data: JSON.stringify({
@@ -349,7 +368,14 @@ describe("RealtimeSession.start", () => {
     });
 
     await vi.waitFor(() => {
-      expect(send).toHaveBeenCalledWith(
+      expect(send).toHaveBeenNthCalledWith(
+        1,
+        JSON.stringify({
+          type: "response.create"
+        })
+      );
+      expect(send).toHaveBeenNthCalledWith(
+        2,
         JSON.stringify({
           type: "conversation.item.create",
           item: {
@@ -362,8 +388,83 @@ describe("RealtimeSession.start", () => {
           }
         })
       );
+      expect(send).toHaveBeenNthCalledWith(
+        3,
+        JSON.stringify({
+          type: "response.create"
+        })
+      );
     });
     expect(close).not.toHaveBeenCalled();
+  });
+
+  it("sends response.create when the data channel opens", async () => {
+    const send = vi.fn();
+    const createDataChannel = vi.fn(() => ({ send, onmessage: null, onopen: null }));
+
+    globalThis.fetch = vi.fn().mockResolvedValue(
+      new Response("answer-sdp", {
+        status: 200,
+        headers: { "Content-Type": "application/sdp" }
+      })
+    );
+    Object.defineProperty(globalThis, "RTCPeerConnection", {
+      configurable: true,
+      value: vi.fn(
+        () =>
+          ({
+            createDataChannel,
+            createOffer: vi.fn().mockResolvedValue({ type: "offer", sdp: "offer-sdp" }),
+            setLocalDescription: vi.fn().mockResolvedValue(undefined),
+            setRemoteDescription: vi.fn().mockResolvedValue(undefined),
+            addTrack: vi.fn(),
+            close: vi.fn(),
+            ontrack: null
+          }) as unknown as RTCPeerConnection
+      ) as unknown as typeof RTCPeerConnection
+    });
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: {
+        mediaDevices: {
+          getUserMedia: vi.fn().mockResolvedValue({
+            getTracks: () => [],
+            getAudioTracks: () => []
+          } as unknown as MediaStream)
+        }
+      }
+    });
+    Object.defineProperty(globalThis, "document", {
+      configurable: true,
+      value: {
+        body: {
+          appendChild: vi.fn()
+        },
+        createElement: vi.fn(() => ({
+          autoplay: false,
+          srcObject: null,
+          remove: vi.fn()
+        }))
+      }
+    });
+
+    const session = new RealtimeSession();
+
+    await session.start("ek_test_123", "gpt-realtime");
+
+    const dataChannel = createDataChannel.mock.results[0]?.value as {
+      onopen: (() => void) | null;
+    };
+
+    expect(send).not.toHaveBeenCalled();
+
+    dataChannel.onopen?.();
+
+    expect(send).toHaveBeenCalledWith(
+      JSON.stringify({
+        type: "response.create"
+      })
+    );
   });
 
   it("ignores malformed data channel events", async () => {
