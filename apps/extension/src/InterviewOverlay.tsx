@@ -13,9 +13,9 @@ import {
   buildProblemPayloadForBackend,
   extractLeetCodeProblem,
   logLeetCodeProblemForDebug,
-  LOOP_NAVIGATE_EVENT,
   type LeetCodeProblem
 } from "./leetcode-page";
+import { createLeetCodeNavigationCoordinator } from "./leetcode-navigation";
 import { createIdleCodeSyncController } from "./code-sync-policy";
 import { captureLatestCodeSnapshot } from "./code-snapshot-runtime";
 import { shouldShowCodeCaptureDebugAction } from "./debug-controls";
@@ -26,6 +26,7 @@ import {
   type PageTone
 } from "./overlay-ui";
 import { computePopoverPlacement } from "./popover-placement";
+import { applyProblemSyncResult } from "./problem-session-sync";
 import { fetchClientSecret, RealtimeSession } from "./realtime-session";
 import {
   closePanel as closeShellPanel,
@@ -232,6 +233,14 @@ export const InterviewOverlay = () => {
   const baseControlRef = useRef<HTMLElement | null>(null);
   const popoverRef = useRef<HTMLElement | null>(null);
   const sessionRef = useRef<RealtimeSession | null>(null);
+  const previousProblemRef = useRef<LeetCodeProblem | null>(null);
+  const previousProblemSlugRef = useRef<string | null>(null);
+  const stateRef = useRef(state);
+  const sessionGenerationRef = useRef(0);
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   useEffect(() => {
     let rafId = 0;
@@ -279,19 +288,37 @@ export const InterviewOverlay = () => {
 
   useEffect(() => {
     const sync = () => {
-      const nextProblem = extractLeetCodeProblem(
-        document,
-        new URL(window.location.href)
-      );
-      logLeetCodeProblemForDebug(nextProblem, new URL(window.location.href));
-      setProblem(nextProblem);
+      const nextUrl = new URL(window.location.href);
+      const nextProblem = extractLeetCodeProblem(document, nextUrl);
+      logLeetCodeProblemForDebug(nextProblem, nextUrl);
+
+      const syncResult = applyProblemSyncResult({
+        nextProblem,
+        previousProblemRef,
+        previousSlugRef: previousProblemSlugRef,
+        sessionRef,
+        setProblem,
+        setState,
+        resetSessionState: endSession,
+        getState: () => stateRef.current
+      });
+
+      if (syncResult.didProblemChange) {
+        sessionGenerationRef.current += 1;
+      }
+
+      return syncResult;
     };
-    sync();
-    window.addEventListener(LOOP_NAVIGATE_EVENT, sync);
-    window.addEventListener("popstate", sync);
+
+    const coordinator = createLeetCodeNavigationCoordinator({
+      initialSyncDelaysMs: INITIAL_OVERLAY_SYNC_DELAYS_MS,
+      syncProblem: sync
+    });
+
+    coordinator.syncNow();
+
     return () => {
-      window.removeEventListener(LOOP_NAVIGATE_EVENT, sync);
-      window.removeEventListener("popstate", sync);
+      coordinator.dispose();
     };
   }, []);
 
@@ -466,6 +493,9 @@ export const InterviewOverlay = () => {
   }, []);
 
   const handleStart = useCallback(() => {
+    const sessionGeneration = sessionGenerationRef.current + 1;
+    sessionGenerationRef.current = sessionGeneration;
+
     setState((currentState) => {
       if (
         currentState.sessionStatus === "connecting" ||
@@ -487,11 +517,23 @@ export const InterviewOverlay = () => {
           locationHref: window.location.href,
           problem
         });
+
+        if (sessionGenerationRef.current !== sessionGeneration) {
+          if ("end" in session) {
+            session.end();
+          }
+          return;
+        }
+
         sessionRef.current = session as RealtimeSession;
         setState((currentState) =>
           confirmConnected(currentState, remainingSeconds)
         );
       } catch {
+        if (sessionGenerationRef.current !== sessionGeneration) {
+          return;
+        }
+
         sessionRef.current = null;
         setState((currentState) => sessionFailed(currentState));
       }
@@ -499,6 +541,7 @@ export const InterviewOverlay = () => {
   }, [problem]);
 
   const handleEnd = useCallback(() => {
+    sessionGenerationRef.current += 1;
     sessionRef.current?.end();
     sessionRef.current = null;
     setState((currentState) => endSession(currentState));
