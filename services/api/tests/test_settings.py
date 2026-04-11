@@ -58,3 +58,8 @@ def test_get_settings_allows_env_overrides_for_model_and_pricing(monkeypatch) ->
     assert settings.realtime_pricing.audio_output_per_million_tokens == 9.87
     assert settings.realtime_pricing.image_input_per_million_tokens == 6.54
     assert settings.realtime_pricing.image_cached_input_per_million_tokens == 0.65
+def test_default_realtime_instructions_includes_proactive_tool_usage() -> None:
+    assert "### Tool Usage" in DEFAULT_REALTIME_INSTRUCTIONS
+    assert "get_current_code_context" in DEFAULT_REALTIME_INSTRUCTIONS
+    assert "proactively" in DEFAULT_REALTIME_INSTRUCTIONS
+    assert "approach planning" in DEFAULT_REALTIME_INSTRUCTIONS

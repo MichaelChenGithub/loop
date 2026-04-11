@@ -11,11 +11,17 @@ type RealtimeClientEvent =
   | { type: "response.create" }
   | {
       type: "conversation.item.create";
-      item: {
-        type: "function_call_output";
-        call_id: string;
-        output: string;
-      };
+      item:
+        | {
+            type: "function_call_output";
+            call_id: string;
+            output: string;
+          }
+        | {
+            type: "message";
+            role: "system";
+            content: [{ type: "input_text"; text: string }];
+          };
     };
 
 type RealtimeDataChannel = Pick<RTCDataChannel, "send" | "onmessage" | "onopen">;
@@ -139,6 +145,17 @@ export class RealtimeSession {
 
     const answerSdp = await response.text();
     await this.pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
+  }
+
+  notifyCodeUpdated(): void {
+    this.sendClientEvent({
+      type: "conversation.item.create",
+      item: {
+        type: "message",
+        role: "system",
+        content: [{ type: "input_text", text: "code updated" }]
+      }
+    });
   }
 
   setMuted(muted: boolean): void {
