@@ -11,11 +11,14 @@ export type OverlayPalette = {
   panelBorder: string;
   panelText: string;
   subtleText: string;
+  divider: string;
   timerBackground: string;
   utilityBackground: string;
   utilityText: string;
   secondaryBackground: string;
   secondaryBorder: string;
+  primaryBackground: string;
+  primaryText: string;
 };
 
 const getStatusColor = (status: InterviewShellState["sessionStatus"]) => {
@@ -76,15 +79,40 @@ const MicIcon = ({ isMuted, size = 18 }: { isMuted: boolean; size?: number }) =>
       <svg
         fill="none"
         height={size}
-        viewBox="0 0 14 14"
+        viewBox="0 0 24 24"
         width={size}
         xmlns="http://www.w3.org/2000/svg">
-        <path
-          d="M7 9.92A3.5 3.5 0 0 0 10.5 6.42V5.25M3.5 5.25v1.17A3.5 3.5 0 0 0 7 9.92ZM7 9.92v1.16M5.83 11.08h2.34M7 1.75A1.75 1.75 0 0 1 8.75 3.5v2.92A1.75 1.75 0 1 1 5.25 6.42V3.5A1.75 1.75 0 0 1 7 1.75Z"
+        <rect
+          height="12"
+          rx="3"
           stroke="currentColor"
           strokeLinecap="round"
           strokeLinejoin="round"
-          strokeWidth="1.2"
+          strokeWidth="2"
+          width="6"
+          x="9"
+          y="2"
+        />
+        <path
+          d="M5 10v2a7 7 0 0 0 14 0v-2"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+        />
+        <path
+          d="M12 19v3"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+        />
+        <path
+          d="M8 22h8"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
         />
       </svg>
     )}
@@ -184,8 +212,6 @@ export const ExpandedPanel = forwardRef<
   {
     problem: LeetCodeProblem | null;
     state: InterviewShellState;
-    pageTone: PageTone;
-    problemDifficultyColor: string;
     palette: OverlayPalette;
     popoverTop: number;
     popoverLeft: number;
@@ -205,8 +231,6 @@ export const ExpandedPanel = forwardRef<
     {
       problem,
       state,
-      pageTone,
-      problemDifficultyColor,
       palette,
       popoverTop,
       popoverLeft,
@@ -237,105 +261,111 @@ export const ExpandedPanel = forwardRef<
     }}>
     <div style={styles.headerRow}>
       <div style={styles.brandBlock}>
-        <AppIcon decorative size={40} style={styles.brandIcon} />
-        <div>
-          <p style={{ ...styles.eyebrow, color: palette.subtleText }}>Loop</p>
-          <h2 style={styles.title}>Interviewer</h2>
+        <AppIcon decorative size={22} style={styles.brandIcon} />
+        <h2 style={styles.brandTitle}>Loop</h2>
+      </div>
+    </div>
+
+    <div style={styles.sectionStack}>
+      <div style={styles.section}>
+        <span style={{ ...styles.sectionLabel, color: palette.subtleText }}>
+          Status
+        </span>
+        <div style={styles.statusRow}>
+          <span
+            aria-label={statusLabel}
+            role="status"
+            style={{
+              ...styles.statusDot,
+              backgroundColor: getStatusColor(state.sessionStatus)
+            }}
+          />
+          <span style={styles.statusText}>
+            {state.sessionStatus === "connected"
+              ? "Session active"
+              : state.sessionStatus === "connecting"
+                ? "Session connecting"
+                : state.sessionStatus === "ended"
+                  ? "Session ended"
+                  : "Session idle"}
+          </span>
         </div>
       </div>
-      <button
-        aria-label="Close interviewer panel"
-        onClick={onClose}
-        style={{
-          ...styles.iconButton,
-          background: palette.secondaryBackground,
-          borderColor: palette.secondaryBorder,
-          color: palette.panelText
-        }}
-        type="button">
-        x
-      </button>
-    </div>
 
-    {problem ? (
-      <div style={styles.problemCard}>
-        <span
+      <div style={{ ...styles.divider, background: palette.divider }} />
+
+      {problem ? (
+        <>
+          <div style={styles.section}>
+            <span style={{ ...styles.sectionLabel, color: palette.subtleText }}>
+              Problem
+            </span>
+            <span
+              style={{ ...styles.problemTitle, color: palette.panelText }}
+              title={problem.title}>
+              {problem.title || problem.slug}
+            </span>
+          </div>
+          <div style={{ ...styles.divider, background: palette.divider }} />
+        </>
+      ) : null}
+
+      <div style={styles.section}>
+        <span style={{ ...styles.sectionLabel, color: palette.subtleText }}>
+          Time remaining
+        </span>
+        <div
           style={{
-            ...styles.difficultyBadge,
-            color: problemDifficultyColor
+            ...styles.timerRow,
+            background: palette.timerBackground
           }}>
-          {problem.difficulty ?? "-"}
-        </span>
-        <span
-          style={{ ...styles.problemTitle, color: palette.panelText }}
-          title={problem.title}>
-          {problem.title || problem.slug}
-        </span>
+          <strong style={styles.timerValue}>{timerText}</strong>
+          <span
+            aria-hidden="true"
+            style={{ ...styles.timerAccent, background: palette.utilityText }}
+          />
+        </div>
       </div>
-    ) : null}
 
-    <div style={styles.summaryRow}>
-      <span
-        aria-label={statusLabel}
-        role="status"
-        style={{
-          ...styles.statusDot,
-          backgroundColor: getStatusColor(state.sessionStatus)
-        }}
-      />
-      <span style={{ ...styles.inlineHint, color: palette.subtleText }}>
-        {state.sessionStatus === "connected" ? "session active" : "session setup"}
-      </span>
-    </div>
+      <div style={{ ...styles.divider, background: palette.divider }} />
 
-    <div
-      style={{
-        ...styles.timerCard,
-        background: palette.timerBackground
-      }}>
-      <span style={styles.timerLabel}>Time remaining</span>
-      <strong style={styles.timerValue}>{timerText}</strong>
-    </div>
-
-    <div style={styles.primaryControls}>
-      <button
-        disabled={isStartDisabled}
-        onClick={onStart}
-        style={{
-          ...styles.primaryButton,
-          opacity: isStartDisabled ? 0.5 : 1,
-          cursor: isStartDisabled ? "default" : "pointer"
-        }}
-        type="button">
-        {state.sessionStatus === "connecting" ? "Connecting..." : "Start"}
-      </button>
-      <button
-        onClick={onEnd}
-        style={{
-          ...styles.secondaryButton,
-          background: palette.secondaryBackground,
-          borderColor: palette.secondaryBorder,
-          color: palette.panelText
-        }}
-        type="button">
-        End
-      </button>
-    </div>
-
-    <div style={styles.footerRow}>
-      <button
-        onClick={onMuteToggle}
-        style={{
-          ...styles.utilityButton,
-          background: palette.utilityBackground,
-          color: palette.utilityText
-        }}
-        type="button">
-        {state.isMuted ? "Unmute mic" : "Mute mic"}
-      </button>
-      <span style={{ ...styles.hintText, color: palette.subtleText }}>
-        {pageTone === "dark" ? "Esc to collapse" : "Click outside to collapse"}
-      </span>
+      <div style={styles.actionsRow}>
+        <button
+          disabled={isStartDisabled}
+          onClick={onStart}
+          style={{
+            ...styles.primaryButton,
+            background: palette.primaryBackground,
+            color: palette.primaryText,
+            opacity: isStartDisabled ? 0.5 : 1,
+            cursor: isStartDisabled ? "default" : "pointer"
+          }}
+          type="button">
+          {state.sessionStatus === "connecting" ? "Connecting..." : "Start"}
+        </button>
+        <button
+          onClick={onEnd}
+          style={{
+            ...styles.secondaryButton,
+            background: palette.secondaryBackground,
+            color: palette.panelText
+          }}
+          type="button">
+          End
+        </button>
+        <button
+          aria-label={getMicLabel(state.isMuted)}
+          onClick={onMuteToggle}
+          style={{
+            ...styles.iconButton,
+            ...styles.micButton,
+            background: palette.secondaryBackground,
+            color: palette.panelText
+          }}
+          type="button">
+          <MicIcon isMuted={state.isMuted} size={14} />
+        </button>
+      </div>
     </div>
 
     {showCodeCaptureDebugAction && onCaptureCode ? (
@@ -345,7 +375,6 @@ export const ExpandedPanel = forwardRef<
           style={{
             ...styles.debugButton,
             background: palette.secondaryBackground,
-            borderColor: palette.secondaryBorder,
             color: palette.panelText
           }}
           type="button">
@@ -420,148 +449,133 @@ const styles: Record<string, CSSProperties> = {
   },
   popover: {
     position: "fixed",
-    width: "336px",
+    width: "284px",
     borderRadius: "20px",
-    border: "1px solid",
-    boxShadow: "0 28px 60px rgba(15, 23, 42, 0.28)",
-    padding: "14px",
+    border: "1px solid transparent",
+    boxShadow: "0 16px 32px rgba(15, 23, 42, 0.18)",
+    padding: "13px 14px 12px",
     pointerEvents: "auto",
-    backdropFilter: "blur(12px)"
+    backdropFilter: "blur(18px)"
   },
   headerRow: {
     display: "flex",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "space-between",
-    gap: "16px"
+    gap: "10px"
   },
   brandBlock: {
     display: "flex",
     alignItems: "center",
-    gap: "12px",
+    gap: "9px",
     minWidth: 0
   },
   brandIcon: {
-    borderRadius: "10px"
+    borderRadius: "7px"
   },
-  eyebrow: {
+  brandTitle: {
     margin: 0,
-    fontSize: "10px",
-    fontWeight: 700,
-    letterSpacing: "0.12em",
-    textTransform: "uppercase"
-  },
-  title: {
-    margin: "4px 0 0",
-    fontSize: "28px",
-    lineHeight: 0.95,
-    letterSpacing: "-0.04em"
+    fontSize: "14px",
+    lineHeight: 1.2,
+    fontWeight: 600,
+    letterSpacing: "-0.02em"
   },
   iconButton: {
-    width: "32px",
-    height: "32px",
+    width: "26px",
+    height: "26px",
     borderRadius: "999px",
-    border: "1px solid",
+    border: "none",
     display: "grid",
     placeItems: "center",
-    fontSize: "18px",
+    fontSize: "12px",
     lineHeight: 1,
     flexShrink: 0,
     cursor: "pointer"
   },
-  problemCard: {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    marginTop: "12px"
+  micButton: {
+    width: "38px",
+    height: "38px",
+    borderRadius: "11px"
   },
-  difficultyBadge: {
-    fontSize: "12px",
-    fontWeight: 700,
-    textTransform: "uppercase",
-    letterSpacing: "0.06em"
-  },
-  problemTitle: {
-    fontSize: "14px",
-    fontWeight: 700,
-    lineHeight: 1.35
-  },
-  summaryRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
+  sectionStack: {
+    display: "grid",
+    gap: "8px",
     marginTop: "10px"
   },
+  section: {
+    display: "grid",
+    gap: "4px"
+  },
+  sectionLabel: {
+    fontSize: "10px",
+    lineHeight: 1.1
+  },
+  statusRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px"
+  },
+  statusText: {
+    fontSize: "12px",
+    lineHeight: 1.3,
+    fontWeight: 500
+  },
+  divider: {
+    height: "0.5px",
+    opacity: 1,
+    margin: "2px 0"
+  },
+  problemTitle: {
+    fontSize: "13px",
+    fontWeight: 600,
+    lineHeight: 1.34
+  },
   statusDot: {
-    width: "6px",
-    height: "6px",
+    width: "7px",
+    height: "7px",
     borderRadius: "999px",
     display: "inline-block",
     flexShrink: 0
   },
-  inlineHint: {
-    fontSize: "11px",
-    textTransform: "uppercase",
-    letterSpacing: "0.06em"
-  },
-  timerCard: {
-    marginTop: "14px",
-    color: "#e2e8f0",
-    borderRadius: "18px",
-    padding: "16px 18px"
-  },
-  timerLabel: {
-    display: "block",
-    fontSize: "11px",
-    textTransform: "uppercase",
-    letterSpacing: "0.12em",
-    color: "#94a3b8"
+  timerRow: {
+    display: "flex",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: "10px"
   },
   timerValue: {
-    display: "block",
-    marginTop: "10px",
-    fontSize: "44px",
-    lineHeight: 1,
-    letterSpacing: "-0.05em"
+    fontSize: "29px",
+    lineHeight: 0.94,
+    letterSpacing: "-0.04em",
+    fontWeight: 600
   },
-  primaryControls: {
+  timerAccent: {
+    width: "18px",
+    height: "3px",
+    borderRadius: "999px",
+    flexShrink: 0
+  },
+  actionsRow: {
     display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "10px",
-    marginTop: "14px"
+    gridTemplateColumns: "1fr 1fr auto",
+    gap: "8px",
+    paddingTop: "4px"
   },
   primaryButton: {
     border: "none",
-    borderRadius: "14px",
-    backgroundColor: "#0f766e",
-    color: "#f8fafc",
-    padding: "13px 10px",
-    fontWeight: 700
+    borderRadius: "11px",
+    minHeight: "38px",
+    padding: "0 10px",
+    fontSize: "12px",
+    fontWeight: 600
   },
   secondaryButton: {
-    borderRadius: "14px",
-    border: "1px solid",
-    padding: "13px 10px",
-    fontWeight: 700,
-    cursor: "pointer"
-  },
-  footerRow: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "10px",
-    marginTop: "14px"
-  },
-  utilityButton: {
+    borderRadius: "11px",
     border: "none",
-    borderRadius: "999px",
-    padding: "10px 14px",
-    fontWeight: 700,
-    cursor: "pointer",
-    whiteSpace: "nowrap"
-  },
-  hintText: {
+    minHeight: "38px",
+    padding: "0 10px",
     fontSize: "12px",
-    textAlign: "right"
+    fontWeight: 600,
+    cursor: "pointer"
   },
   debugRow: {
     display: "flex",
@@ -570,7 +584,7 @@ const styles: Record<string, CSSProperties> = {
   },
   debugButton: {
     borderRadius: "12px",
-    border: "1px solid",
+    border: "none",
     padding: "10px 12px",
     fontSize: "12px",
     fontWeight: 700,

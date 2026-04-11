@@ -95,18 +95,19 @@ describe("overlay ui", () => {
           ...baseState,
           isPanelExpanded: true
         },
-        pageTone: "dark",
-        problemDifficultyColor: "#4ade80",
         palette: {
           panelBackground: "#0f172a",
           panelBorder: "#334155",
           panelText: "#e2e8f0",
           subtleText: "#94a3b8",
+          divider: "rgba(255,255,255,0.05)",
           timerBackground: "#111827",
           secondaryBackground: "#1e293b",
           secondaryBorder: "#475569",
           utilityBackground: "#1d4ed8",
-          utilityText: "#dbeafe"
+          utilityText: "#dbeafe",
+          primaryBackground: "#f8fafc",
+          primaryText: "#0f172a"
         },
         popoverTop: 48,
         popoverLeft: 64,
@@ -123,14 +124,19 @@ describe("overlay ui", () => {
     );
 
     expect(html).toContain("Loop");
-    expect(html).toContain("Interviewer");
     expect(html).toContain("data-app-icon=\"true\"");
+    expect(html).toContain(">Status<");
+    expect(html).toContain(">Problem<");
+    expect(html).toContain(">Time remaining<");
     expect(html).toContain("Two Sum");
+    expect(html).not.toContain("Easy");
     expect(html).toContain("aria-label=\"Session connected\"");
     expect(html).toContain("left:64px");
     expect(html).toContain("top:48px");
     expect(html).toContain(">End<");
-    expect(html).toContain(">Mute mic<");
+    expect(html).toContain(">Start<");
+    expect(html).toContain("aria-label=\"Mute microphone\"");
+    expect(html).toContain("width:284px");
   });
 
   it("keeps the collapsed toolbar free of branding artwork", () => {

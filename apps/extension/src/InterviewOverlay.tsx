@@ -49,8 +49,8 @@ import {
 import { shouldMountInterviewOverlay } from "./overlay-visibility";
 import { isLeetCodeEditorInputTarget } from "./leetcode-editor";
 
-const PANEL_WIDTH = 336;
-const PANEL_ESTIMATED_HEIGHT = 260;
+const PANEL_WIDTH = 284;
+const PANEL_ESTIMATED_HEIGHT = 360;
 
 const API_BASE_URL =
   process.env.PLASMO_PUBLIC_API_HOST ?? "http://localhost:8000";
@@ -119,16 +119,6 @@ const readPageTone = (): PageTone =>
     window.getComputedStyle(document.body).backgroundColor,
     window.getComputedStyle(document.documentElement).backgroundColor
   );
-
-const difficultyColor = (
-  difficulty: LeetCodeProblem["difficulty"],
-  tone: PageTone
-): string => {
-  if (difficulty === "Easy") return tone === "dark" ? "#4ade80" : "#15803d";
-  if (difficulty === "Medium") return tone === "dark" ? "#fbbf24" : "#d97706";
-  if (difficulty === "Hard") return tone === "dark" ? "#f87171" : "#dc2626";
-  return tone === "dark" ? "#94a3b8" : "#64748b";
-};
 
 const sameAnchor = (left: ToolbarAnchorResult, right: ToolbarAnchorResult) =>
   left.mode === right.mode &&
@@ -525,36 +515,38 @@ export const InterviewOverlay = () => {
   const palette =
     pageTone === "dark"
       ? {
-          buttonBackground: "rgba(38, 38, 46, 0.96)",
-          buttonBorder: "rgba(255, 255, 255, 0.08)",
+          buttonBackground: "rgba(24, 24, 24, 0.96)",
+          buttonBorder: "rgba(255, 255, 255, 0.04)",
           buttonText: "#f8fafc",
-          panelBackground:
-            "linear-gradient(180deg, rgba(17,24,39,0.98), rgba(15,23,42,0.98))",
-          panelBorder: "rgba(148, 163, 184, 0.18)",
-          panelText: "#e5eefc",
-          subtleText: "#94a3b8",
-          timerBackground:
-            "linear-gradient(180deg, rgba(2,6,23,0.98), rgba(15,23,42,0.98))",
-          utilityBackground: "rgba(37, 99, 235, 0.18)",
-          utilityText: "#93c5fd",
-          secondaryBackground: "rgba(30, 41, 59, 0.82)",
-          secondaryBorder: "rgba(148, 163, 184, 0.18)"
+          panelBackground: "rgba(24, 24, 24, 0.96)",
+          panelBorder: "rgba(255, 255, 255, 0.04)",
+          panelText: "#f4f4f5",
+          subtleText: "rgba(244, 244, 245, 0.5)",
+          divider: "rgba(255, 255, 255, 0.18)",
+          timerBackground: "transparent",
+          utilityBackground: "rgba(253, 144, 0, 0.1)",
+          utilityText: "linear-gradient(90deg, #ff8aa9, #fd9000)",
+          secondaryBackground: "rgba(255, 255, 255, 0.05)",
+          secondaryBorder: "transparent",
+          primaryBackground: "linear-gradient(135deg, #ff8aa9, #fd9000)",
+          primaryText: "#18181b"
         }
       : {
           buttonBackground: "rgba(255, 255, 255, 0.97)",
-          buttonBorder: "rgba(148, 163, 184, 0.35)",
-          buttonText: "#0f172a",
-          panelBackground:
-            "linear-gradient(180deg, rgba(255,255,255,0.98), rgba(240,247,255,0.98))",
-          panelBorder: "rgba(148, 163, 184, 0.28)",
-          panelText: "#0f172a",
-          subtleText: "#64748b",
-          timerBackground:
-            "linear-gradient(180deg, rgba(15,23,42,0.96), rgba(30,41,59,0.98))",
-          utilityBackground: "#dbeafe",
-          utilityText: "#1d4ed8",
-          secondaryBackground: "rgba(248, 250, 252, 0.92)",
-          secondaryBorder: "rgba(148, 163, 184, 0.45)"
+          buttonBorder: "rgba(15, 23, 42, 0.04)",
+          buttonText: "#18181b",
+          panelBackground: "rgba(255, 255, 255, 0.92)",
+          panelBorder: "rgba(15, 23, 42, 0.04)",
+          panelText: "#18181b",
+          subtleText: "rgba(24, 24, 27, 0.5)",
+          divider: "rgba(24, 24, 27, 0.16)",
+          timerBackground: "transparent",
+          utilityBackground: "rgba(158, 0, 180, 0.08)",
+          utilityText: "linear-gradient(90deg, #9e00b4, #ed69ff)",
+          secondaryBackground: "rgba(15, 23, 42, 0.05)",
+          secondaryBorder: "transparent",
+          primaryBackground: "linear-gradient(135deg, #9e00b4, #ed69ff)",
+          primaryText: "#ffffff"
         };
 
   const isStartDisabled =
@@ -608,12 +600,10 @@ export const InterviewOverlay = () => {
           onEnd={handleEnd}
           onMuteToggle={handleMuteToggle}
           onStart={handleStart}
-          pageTone={pageTone}
           palette={palette}
           popoverLeft={popoverPlacement.left}
           popoverTop={popoverPlacement.top}
           problem={problem}
-          problemDifficultyColor={difficultyColor(problem?.difficulty ?? null, pageTone)}
           showCodeCaptureDebugAction={showCodeCaptureDebugAction}
           state={state}
           statusLabel={statusLabel}
