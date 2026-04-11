@@ -1,7 +1,6 @@
 import {
   CAPTURE_LATEST_CODE_SNAPSHOT_MESSAGE_TYPE,
   GET_LATEST_CODE_SNAPSHOT_MESSAGE_TYPE,
-  READ_LATEST_CODE_SNAPSHOT_FROM_PAGE_MESSAGE_TYPE,
   type CaptureLatestCodeSnapshotResponse,
   type LatestCodeSnapshot
 } from "../code-snapshot";
@@ -19,10 +18,50 @@ let latestCodeSnapshot: LatestCodeSnapshot | null = null;
 
 type RuntimeLike = Pick<typeof chrome.runtime, "onMessage">;
 type MessageResponder = (response: CaptureLatestCodeSnapshotResponse) => void;
-type SendPageMessage = (
-  tabId: number,
-  message: { type: typeof READ_LATEST_CODE_SNAPSHOT_FROM_PAGE_MESSAGE_TYPE }
-) => Promise<LatestCodeSnapshot | null>;
+
+type MonacoSnapshotResult = {
+  code: string;
+  language: string | null;
+  problemSlug: string | null;
+} | null;
+
+type CaptureSnapshotFromMainWorld = (tabId: number) => Promise<MonacoSnapshotResult>;
+
+const captureSnapshotInMainWorld = (): MonacoSnapshotResult => {
+  const mon = (window as unknown as { monaco?: { editor?: {
+    getModels?: () => Array<{ getValue(): string; getLanguageId(): string | null }>;
+  } } }).monaco?.editor;
+  if (!mon) return null;
+  const slug =
+    window.location.pathname.match(/\/problems\/([^/]+)/)?.[1] ?? null;
+  const lang: string | null =
+    (document.querySelector("[data-mode-id]") as HTMLElement | null)
+      ?.dataset?.modeId?.trim() ??
+    document.querySelector('[data-cy="lang-select"]')?.textContent?.trim() ??
+    null;
+  const SKIP = new Set(["plaintext", "markdown", "json", "yaml", "xml", "html", "css"]);
+  const models = mon.getModels?.() ?? [];
+  const target = models.find(
+    (m) => m.getValue().length > 0 && !SKIP.has(m.getLanguageId() ?? "")
+  );
+  if (!target) return null;
+  return {
+    code: target.getValue(),
+    language: target.getLanguageId() ?? lang,
+    problemSlug: slug
+  };
+};
+
+const defaultCaptureSnapshotFromMainWorld: CaptureSnapshotFromMainWorld = async (
+  tabId
+) => {
+  const results = await chrome.scripting.executeScript({
+    target: { tabId },
+    world: "MAIN",
+    func: captureSnapshotInMainWorld
+  });
+  return results?.[0]?.result ?? null;
+};
 
 export const getLatestCodeSnapshot = (): LatestCodeSnapshot | null =>
   latestCodeSnapshot;
@@ -97,11 +136,12 @@ const logRealtimeToolResult = (output: CurrentCodeContextToolOutput): void => {
 
 export const installBackgroundMessageHandlers = ({
   runtime = chrome.runtime,
-  sendPageMessage = (tabId, message) =>
-    chrome.tabs.sendMessage(tabId, message) as Promise<LatestCodeSnapshot | null>
+  captureSnapshotFromMainWorld = defaultCaptureSnapshotFromMainWorld,
+  getNowIsoString = () => new Date().toISOString()
 }: {
   runtime?: RuntimeLike;
-  sendPageMessage?: SendPageMessage;
+  captureSnapshotFromMainWorld?: CaptureSnapshotFromMainWorld;
+  getNowIsoString?: () => string;
 } = {}): void => {
   // Keep the canonical snapshot here so future Realtime tool calling can read
   // from background instead of depending on page-local React/content-script state.
@@ -133,10 +173,16 @@ export const installBackgroundMessageHandlers = ({
       return false;
     }
 
-    void sendPageMessage(tabId, {
-      type: READ_LATEST_CODE_SNAPSHOT_FROM_PAGE_MESSAGE_TYPE
-    }).then((snapshot) => {
-      if (snapshot) {
+    void captureSnapshotFromMainWorld(tabId).then((result) => {
+      let snapshot: LatestCodeSnapshot | null = null;
+      if (result) {
+        snapshot = {
+          code: result.code,
+          language: result.language,
+          problemSlug: result.problemSlug,
+          updatedAt: getNowIsoString(),
+          source: "leetcode-editor"
+        };
         setLatestCodeSnapshot(snapshot);
         console.log("[loop] latest code snapshot", snapshot);
       }
