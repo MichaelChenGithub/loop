@@ -86,8 +86,9 @@ def test_broker_posts_backend_owned_defaults_to_openai() -> None:
             "type": "function",
             "name": "get_current_code_context",
             "description": (
-                "Get the user's latest LeetCode codepad snapshot from the extension "
-                "background state."
+                "Retrieve the candidate's current editor content — including code, pseudocode, and comments. "
+                "Call this whenever the candidate may have written anything in the editor: during approach "
+                "planning, implementation, debugging, or optimization. Do not wait for the candidate to ask."
             ),
             "parameters": {"type": "object", "properties": {}, "required": []},
         }
