@@ -53,3 +53,26 @@ def test_compile_realtime_instructions_preserves_base_prompt_and_appends_problem
         " prompt, do not substitute another question, and keep follow-ups anchored to this"
         " problem."
     ) in instructions
+
+
+def test_compile_realtime_instructions_hardens_against_problem_switch_requests() -> None:
+    problem = RealtimeProblem.model_validate(
+        {
+            "slug": "two-sum",
+            "title": "Two Sum",
+            "difficulty": "Easy",
+            "description": "Given an array of integers nums and an integer target.",
+            "examples": [],
+            "constraints": [],
+        }
+    )
+
+    instructions = compile_realtime_instructions(
+        "## System Prompt\nYou are a strict interviewer.",
+        problem,
+    )
+
+    assert "Treat the provided problem as immutable session context." in instructions
+    assert "Do not replace, rewrite, swap, or invent a different problem" in instructions
+    assert "If the user asks for another question, refuse briefly" in instructions
+    assert "Only change problems when the application provides a new problem block." in instructions
