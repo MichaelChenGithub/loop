@@ -36,8 +36,14 @@ uvicorn app.main:app --reload         # run FastAPI dev server (from services/ap
 - `OPENAI_REALTIME_VOICE` — default `alloy`
 - `MAX_INTERVIEW_SECONDS` — default `600`
 - `OPENAI_REALTIME_INSTRUCTIONS` — overrides the built-in system prompt
+- `SUPABASE_URL` — required for auth; Supabase project URL (e.g. `https://xxxx.supabase.co`)
+- `SUPABASE_SECRET_KEY` — required for auth; secret key from Supabase dashboard (replaces legacy service_role key)
 
-**Extension API base URL** is read from `PLASMO_PUBLIC_API_HOST` at build time (defaults to `http://localhost:8000`).
+**Extension build-time env vars** (`apps/extension/.env` or shell):
+- `PLASMO_PUBLIC_API_HOST` — API base URL (defaults to `http://localhost:8000`)
+- `PLASMO_PUBLIC_SUPABASE_URL` — Supabase project URL (same value as `SUPABASE_URL`)
+- `PLASMO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — Supabase publishable key from dashboard (replaces legacy anon key)
+- `PLASMO_PUBLIC_CONTACT_EMAIL` — email shown in quota-exhausted and beta-full CTAs
 
 ## Architecture
 
