@@ -50,7 +50,7 @@ uvicorn app.main:app --reload         # run FastAPI dev server (from services/ap
 ### High-level flow
 1. The Chrome extension content script (`apps/extension/src/contents/leetcode.tsx`) mounts a shadow-DOM host on every `leetcode.com/problems/*` page, then renders `InterviewOverlay` inside it.
 2. `InterviewOverlay` scrapes the current problem from the DOM (`leetcode-page.ts`) and manages the full session lifecycle.
-3. When the user starts a session, the extension POSTs the problem payload to the FastAPI backend (`POST /v1/realtime/sessions`). The backend mints a short-lived OpenAI Realtime client secret via `RealtimeClientSecretBroker` and returns it.
+3. When the user starts a session, the extension POSTs the problem payload (with a Supabase JWT) to `POST /v1/realtime/sessions`. The backend verifies the token, checks the per-user quota (max 3 sessions; sessions ≤180 s are free), mints a short-lived OpenAI Realtime client secret via `RealtimeClientSecretBroker`, and returns it. When the session ends, the extension calls `POST /v1/realtime/sessions/end` to record usage.
 4. The extension creates a WebRTC peer connection (`RealtimeSession`) using that client secret, enabling bidirectional voice with the OpenAI Realtime API.
 5. A service-worker background script (`background/index.ts`) stores the latest code snapshot so it can be forwarded to the Realtime model in future tool-call flows.
 
@@ -62,8 +62,15 @@ uvicorn app.main:app --reload         # run FastAPI dev server (from services/ap
 | `overlay-ui.tsx` | Presentational components: `CollapsedToolbar`, `ExpandedPanel` |
 | `realtime-session.ts` | `RealtimeSession` class (WebRTC) + `fetchClientSecret` |
 | `leetcode-page.ts` | DOM scraping: title, difficulty, description, examples, constraints |
+| `leetcode-editor.ts` | Reads current code from the LeetCode Monaco editor |
+| `leetcode-navigation.ts` | Detects problem navigation; fires `LOOP_NAVIGATE_EVENT` |
 | `code-snapshot.ts` | Shared message-type constants for the snapshot protocol |
 | `code-snapshot-runtime.ts` | Page-side reader that the content script installs |
+| `code-sync-policy.ts` | Debounce / idle-gate policy for code-snapshot forwarding |
+| `problem-session-sync.ts` | Coordinates session reset when the active problem changes |
+| `realtime-tool-dispatch.ts` | Routes OpenAI Realtime tool-call events to handlers |
+| `auth.ts` | Supabase auth client; Google sign-in flow |
+| `auth-messages.ts` | Message-type constants for background↔content auth protocol |
 | `background/index.ts` | SW that relays snapshot messages and caches the latest snapshot |
 | `contents/leetcode.tsx` | Plasmo content-script entry point; creates shadow DOM, exports `InterviewOverlay` |
 | `toolbar-anchor.ts` | Resolves where to position the floating button relative to LeetCode's toolbar |
@@ -75,11 +82,14 @@ uvicorn app.main:app --reload         # run FastAPI dev server (from services/ap
 ### API source map (`services/api/app/`)
 | File | Role |
 |---|---|
-| `main.py` | FastAPI app factory; single endpoint `POST /v1/realtime/sessions` |
+| `main.py` | FastAPI app factory; endpoints: `GET /health`, `POST /v1/realtime/sessions`, `POST /v1/realtime/sessions/end` |
 | `core/realtime.py` | `RealtimeClientSecretBroker` — calls OpenAI `/v1/realtime/client_secrets` |
+| `core/auth.py` | Supabase JWT verification; `get_current_user_id` FastAPI dependency |
+| `core/db.py` | Supabase client singleton (`get_supabase()`) |
 | `core/settings.py` | `get_settings()` — reads env vars; contains the default system prompt |
 | `core/prompt_compiler.py` | `compile_realtime_instructions()` — interpolates problem context into the system prompt |
 | `models/realtime.py` | Pydantic request/response models |
+| `api/quota.py` | Per-user session quota tracking (cap: 3 sessions; sessions ≤180 s are free) |
 
 ### Shared package (`packages/shared/src/`)
 Exports TypeScript types and constants shared between workspace packages. Referenced as `@loop/shared`.

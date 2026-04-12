@@ -9,7 +9,7 @@
 - `docs/architecture`: contracts and design notes.
 - `scripts`: repo-level helpers and operational notes.
 
-Keep new code close to its runtime. For example, add extension UI logic under `apps/extension/src/` and backend request models under `services/api/app/models/`.
+Keep new code close to its runtime. For example, add extension UI logic under `apps/extension/src/` and backend request models under `services/api/app/models/`. Auth logic belongs in `services/api/app/core/auth.py`; quota enforcement in `services/api/app/api/quota.py`.
 
 ## Build, Test, and Development Commands
 - `corepack pnpm install`: install workspace dependencies.
@@ -27,11 +27,11 @@ TypeScript uses 2-space indentation, double quotes, `camelCase` for functions/va
 Python uses 4-space indentation and Ruff defaults from `pyproject.toml` with a 100-character line limit. Prefer `snake_case` for functions/modules and keep FastAPI models explicit and typed.
 
 ## Testing Guidelines
-Add unit tests alongside extension source in `apps/extension/src/` when behavior is module-local. Put browser-level scenarios in `apps/extension/tests/`. Backend tests belong in `services/api/tests/` and should cover request validation, broker failures, and response sanitization.
+Add unit tests alongside extension source in `apps/extension/src/` when behavior is module-local. Put browser-level scenarios in `apps/extension/tests/`. Backend tests belong in `services/api/tests/` and should cover request validation, broker failures, response sanitization, auth token verification, and quota enforcement.
 
 Run the relevant test target before opening a PR. No formal coverage gate is configured, so match the surrounding test depth for any changed behavior.
 
 ## Commit & Pull Request Guidelines
 Recent history follows concise Conventional Commit-style subjects such as `feat: add leetcode code snapshot foundation`. Use the same pattern: `feat:`, `fix:`, `test:`, `docs:`, `refactor:`.
 
-PRs should include a short summary, linked issue when applicable, and screenshots or recordings for extension UI changes. Call out any API contract changes and list the verification commands you ran.
+PRs should include a short summary, linked issue when applicable, and screenshots or recordings for extension UI changes. Call out any API contract changes (including auth or quota behaviour) and list the verification commands you ran.
