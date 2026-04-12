@@ -4,8 +4,9 @@ from collections.abc import Callable
 from typing import Any
 
 import httpx
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from supabase import Client
 
 from app.core.auth import get_current_user_id
@@ -70,7 +71,7 @@ def _check_and_register_user(user_id: str, db: Client) -> None:
         .execute()
     )
 
-    if existing.data is None:
+    if existing is None:
         # New user — atomically claim a beta slot
         result = (
             db.rpc("claim_beta_slot", {})
@@ -100,8 +101,13 @@ def create_app(
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["https://leetcode.com", "https://www.leetcode.com"],
-        allow_methods=["POST"],
+        allow_methods=["POST", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type"],
     )
+
+    @app.exception_handler(Exception)
+    async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+        return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
     session_creator = create_session or _default_session_creator
     db_factory = get_db or get_supabase

@@ -48,6 +48,25 @@ def test_health_returns_ok() -> None:
     assert response.json() == {"status": "ok"}
 
 
+def test_cors_preflight_allows_extension_session_request_headers() -> None:
+    client = TestClient(create_app())
+
+    response = client.options(
+        "/v1/realtime/sessions",
+        headers={
+            "Origin": "https://leetcode.com",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "authorization,content-type",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "https://leetcode.com"
+    allow_headers = response.headers["access-control-allow-headers"].lower()
+    assert "authorization" in allow_headers
+    assert "content-type" in allow_headers
+
+
 def test_create_realtime_session_returns_browser_safe_fields_only() -> None:
     created = []
 

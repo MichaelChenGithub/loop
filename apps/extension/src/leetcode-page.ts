@@ -254,8 +254,13 @@ export const buildProblemPayloadForBackend = (
 
 export const logLeetCodeProblemForDebug = (
   problem: LeetCodeProblem | null,
-  url: URL
+  url: URL,
+  enabled: boolean = process.env.NODE_ENV !== "production"
 ): void => {
+  if (!enabled) {
+    return;
+  }
+
   console.info(
     "[loop] Outbound backend payload",
     buildProblemPayloadForBackend(problem, url)

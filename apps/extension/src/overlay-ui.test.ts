@@ -4,7 +4,13 @@ import { describe, expect, it } from "vitest";
 
 import type { LeetCodeProblem } from "./leetcode-page";
 import type { InterviewShellState } from "./state";
-import { CollapsedToolbar, ExpandedPanel } from "./overlay-ui";
+import {
+  BetaFullScreen,
+  CollapsedToolbar,
+  ExpandedPanel,
+  NoQuotaScreen,
+  SignInScreen
+} from "./overlay-ui";
 
 const problem: LeetCodeProblem = {
   slug: "two-sum",
@@ -144,6 +150,41 @@ describe("overlay ui", () => {
     expect(html).toContain("width:284px");
   });
 
+  it("renders the timer in normal color when remainingSeconds > 300", () => {
+    const html = renderToStaticMarkup(
+      createElement(CollapsedToolbar, {
+        state: { ...baseState, remainingSeconds: 301 },
+        pageTone: "dark",
+        timerText: "05:01",
+        statusLabel: "Session connected",
+        isTimerWarning: false,
+        onMuteToggle: () => undefined,
+        onEnd: () => undefined,
+        onExpand: () => undefined
+      })
+    );
+
+    expect(html).not.toContain("#f87171");
+    expect(html).toContain("color:#fd9000");
+  });
+
+  it("renders the timer in warning color when isTimerWarning is true", () => {
+    const html = renderToStaticMarkup(
+      createElement(CollapsedToolbar, {
+        state: { ...baseState, remainingSeconds: 300 },
+        pageTone: "dark",
+        timerText: "05:00",
+        statusLabel: "Session connected",
+        isTimerWarning: true,
+        onMuteToggle: () => undefined,
+        onEnd: () => undefined,
+        onExpand: () => undefined
+      })
+    );
+
+    expect(html).toContain("#f87171");
+  });
+
   it("renders branding artwork only inside the collapsed loop chip", () => {
     const html = renderToStaticMarkup(
       createElement(CollapsedToolbar, {
@@ -158,5 +199,75 @@ describe("overlay ui", () => {
     );
 
     expect(html).toContain("data-app-icon=\"true\"");
+  });
+});
+
+const gatePalette = {
+  panelBackground: "#0f172a",
+  panelBorder: "#334155",
+  panelText: "#e2e8f0",
+  subtleText: "#94a3b8",
+  divider: "rgba(255,255,255,0.05)",
+  timerBackground: "#111827",
+  secondaryBackground: "#1e293b",
+  secondaryBorder: "#475569",
+  utilityBackground: "#1d4ed8",
+  utilityText: "#dbeafe",
+  primaryBackground: "#f8fafc",
+  primaryText: "#0f172a"
+};
+
+const gateProps = {
+  palette: gatePalette,
+  popoverTop: 48,
+  popoverLeft: 64,
+  transformOrigin: "top left"
+};
+
+describe("SignInScreen", () => {
+  it("renders Loop branding and a sign-in button", () => {
+    const html = renderToStaticMarkup(
+      createElement(SignInScreen, { ...gateProps, onSignIn: () => undefined })
+    );
+
+    expect(html).toContain("Loop");
+    expect(html).toContain("data-app-icon=\"true\"");
+    expect(html).toContain("Sign in with Google");
+    expect(html).toContain("aria-label=\"Loop sign in\"");
+  });
+
+  it("positions the panel at the given coordinates", () => {
+    const html = renderToStaticMarkup(
+      createElement(SignInScreen, { ...gateProps, onSignIn: () => undefined })
+    );
+
+    expect(html).toContain("top:48px");
+    expect(html).toContain("left:64px");
+  });
+});
+
+describe("BetaFullScreen", () => {
+  it("renders the beta-full message and an email CTA", () => {
+    const html = renderToStaticMarkup(
+      createElement(BetaFullScreen, gateProps)
+    );
+
+    expect(html).toContain("Beta is full");
+    expect(html).toContain("aria-label=\"Loop beta full\"");
+    expect(html).toContain("Email me to get in");
+    expect(html).toContain("mailto:");
+  });
+});
+
+describe("NoQuotaScreen", () => {
+  it("renders the no-quota message and an email CTA", () => {
+    const html = renderToStaticMarkup(
+      createElement(NoQuotaScreen, gateProps)
+    );
+
+    expect(html).toContain("No sessions remaining");
+    expect(html).toContain("aria-label=\"Loop no quota\"");
+    expect(html).toContain("Email me to get more");
+    expect(html).toContain("mailto:");
   });
 });

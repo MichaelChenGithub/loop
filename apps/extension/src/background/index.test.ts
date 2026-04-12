@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  LAUNCH_AUTH_FLOW_MESSAGE_TYPE,
+  SIGN_IN_WITH_GOOGLE_MESSAGE_TYPE
+} from "../auth-messages";
+import {
   CAPTURE_LATEST_CODE_SNAPSHOT_MESSAGE_TYPE,
   GET_LATEST_CODE_SNAPSHOT_MESSAGE_TYPE,
   type LatestCodeSnapshot
@@ -283,6 +287,85 @@ describe("installBackgroundMessageHandlers", () => {
       code: null
     });
     expect(logSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("launches auth flow in the background for content-script sign-in requests", () => {
+    const addListener = vi.fn();
+    const launchWebAuthFlow = vi.fn((_details, callback: (url?: string) => void) => {
+      callback("https://abcdefghijklmnop.chromiumapp.org/?code=auth-code");
+    });
+
+    vi.stubGlobal("chrome", {
+      identity: {
+        launchWebAuthFlow
+      },
+      runtime: {
+        lastError: undefined
+      }
+    });
+
+    installBackgroundMessageHandlers({
+      runtime: {
+        onMessage: { addListener }
+      } as never
+    });
+
+    const listener = addListener.mock.calls[0]?.[0];
+    const sendResponse = vi.fn();
+
+    const keepChannelOpen = listener(
+      {
+        type: LAUNCH_AUTH_FLOW_MESSAGE_TYPE,
+        url: "https://accounts.google.com/o/oauth2/auth?...",
+        interactive: true
+      },
+      {},
+      sendResponse
+    );
+
+    expect(keepChannelOpen).toBe(true);
+    expect(launchWebAuthFlow).toHaveBeenCalledWith(
+      {
+        url: "https://accounts.google.com/o/oauth2/auth?...",
+        interactive: true
+      },
+      expect.any(Function)
+    );
+    expect(sendResponse).toHaveBeenCalledWith({
+      ok: true,
+      redirectUrl: "https://abcdefghijklmnop.chromiumapp.org/?code=auth-code"
+    });
+  });
+
+  it("runs the full Google sign-in flow in the background worker", async () => {
+    const addListener = vi.fn();
+    const authClient = {
+      signInWithGoogle: vi.fn().mockResolvedValue(undefined)
+    };
+
+    installBackgroundMessageHandlers({
+      runtime: {
+        onMessage: { addListener }
+      } as never,
+      authClient: authClient as never
+    });
+
+    const listener = addListener.mock.calls[0]?.[0];
+    const sendResponse = vi.fn();
+
+    const keepChannelOpen = listener(
+      {
+        type: SIGN_IN_WITH_GOOGLE_MESSAGE_TYPE
+      },
+      {},
+      sendResponse
+    );
+
+    expect(keepChannelOpen).toBe(true);
+    await vi.waitFor(() => {
+      expect(authClient.signInWithGoogle).toHaveBeenCalledOnce();
+      expect(sendResponse).toHaveBeenCalledWith({ ok: true });
+    });
   });
 });
 

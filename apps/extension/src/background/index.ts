@@ -4,6 +4,16 @@ import {
   type CaptureLatestCodeSnapshotResponse,
   type LatestCodeSnapshot
 } from "../code-snapshot";
+import {
+  createAuthClient,
+  realChromeIdentity,
+  realChromeStorage,
+  type AuthClient
+} from "../auth";
+import {
+  LAUNCH_AUTH_FLOW_MESSAGE_TYPE,
+  SIGN_IN_WITH_GOOGLE_MESSAGE_TYPE
+} from "../auth-messages";
 
 export type CurrentCodeContextToolOutput = {
   available: boolean;
@@ -136,16 +146,56 @@ const logRealtimeToolResult = (output: CurrentCodeContextToolOutput): void => {
 
 export const installBackgroundMessageHandlers = ({
   runtime = chrome.runtime,
+  authClient = createAuthClient({
+    storage: realChromeStorage,
+    identity: realChromeIdentity,
+    supabaseUrl: process.env.PLASMO_PUBLIC_SUPABASE_URL ?? "",
+    supabaseKey: process.env.PLASMO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "",
+  }),
   captureSnapshotFromMainWorld = defaultCaptureSnapshotFromMainWorld,
   getNowIsoString = () => new Date().toISOString()
 }: {
   runtime?: RuntimeLike;
+  authClient?: Pick<AuthClient, "signInWithGoogle">;
   captureSnapshotFromMainWorld?: CaptureSnapshotFromMainWorld;
   getNowIsoString?: () => string;
 } = {}): void => {
   // Keep the canonical snapshot here so future Realtime tool calling can read
   // from background instead of depending on page-local React/content-script state.
   runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message?.type === LAUNCH_AUTH_FLOW_MESSAGE_TYPE) {
+      // chrome.identity is only available in the background SW, not content scripts.
+      // The content script's authClient routes launchWebAuthFlow here via message.
+      chrome.identity.launchWebAuthFlow(
+        { url: message.url as string, interactive: message.interactive as boolean },
+        (responseUrl) => {
+          if (chrome.runtime.lastError) {
+            sendResponse({ ok: false, error: chrome.runtime.lastError.message });
+          } else if (!responseUrl) {
+            sendResponse({ ok: false, error: "Auth flow was cancelled" });
+          } else {
+            sendResponse({ ok: true, redirectUrl: responseUrl });
+          }
+        }
+      );
+      return true; // keep the message channel open for the async callback
+    }
+
+    if (message?.type === SIGN_IN_WITH_GOOGLE_MESSAGE_TYPE) {
+      void authClient
+        .signInWithGoogle()
+        .then(() => {
+          sendResponse({ ok: true });
+        })
+        .catch((error: unknown) => {
+          sendResponse({
+            ok: false,
+            error: error instanceof Error ? error.message : "Google sign-in failed"
+          });
+        });
+      return true;
+    }
+
     if (message?.type === GET_LATEST_CODE_SNAPSHOT_MESSAGE_TYPE) {
       const snapshot = getLatestCodeSnapshot();
       logRealtimeToolCall(snapshot);
