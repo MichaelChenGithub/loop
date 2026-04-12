@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
+
+from dotenv import load_dotenv
 
 DEFAULT_REALTIME_INSTRUCTIONS = """## System Prompt: Google-Style Coding Interviewer (Voice Mode)
 
@@ -290,7 +293,21 @@ class Settings:
     supabase_secret_key: str | None
 
 
+def _load_local_env_files() -> None:
+    if os.getenv("LOOP_DISABLE_DOTENV") == "1":
+        return
+
+    settings_file = Path(__file__).resolve()
+    api_dir = settings_file.parents[2]
+    repo_root = settings_file.parents[4]
+
+    for env_path in (api_dir / ".env", repo_root / ".env"):
+        if env_path.exists():
+            load_dotenv(env_path, override=False)
+
+
 def get_settings() -> Settings:
+    _load_local_env_files()
     realtime_model = os.getenv("OPENAI_REALTIME_MODEL", "gpt-realtime-mini")
 
     return Settings(

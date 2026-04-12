@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
+import app.core.settings as settings_module
 from app.core.settings import DEFAULT_REALTIME_INSTRUCTIONS, get_settings
 
 
@@ -14,6 +16,7 @@ def test_default_realtime_instructions_uses_google_style_prompt() -> None:
 
 
 def test_get_settings_defaults_to_gpt_realtime_mini(monkeypatch) -> None:
+    monkeypatch.setenv("LOOP_DISABLE_DOTENV", "1")
     monkeypatch.delenv("OPENAI_REALTIME_MODEL", raising=False)
 
     settings = get_settings()
@@ -31,6 +34,7 @@ def test_get_settings_defaults_to_gpt_realtime_mini(monkeypatch) -> None:
 
 
 def test_get_settings_allows_env_overrides_for_model_and_pricing(monkeypatch) -> None:
+    monkeypatch.setenv("LOOP_DISABLE_DOTENV", "1")
     monkeypatch.setenv("OPENAI_REALTIME_MODEL", "gpt-realtime")
     monkeypatch.setenv("OPENAI_REALTIME_PRICING_MODEL", "custom-realtime-pricing")
     monkeypatch.setenv("OPENAI_REALTIME_TEXT_INPUT_PER_MILLION_TOKENS", "1.23")
@@ -70,6 +74,7 @@ def test_default_realtime_instructions_includes_proactive_tool_usage() -> None:
 
 
 def test_get_settings_supabase_defaults_to_none() -> None:
+    os.environ["LOOP_DISABLE_DOTENV"] = "1"
     for var in ("SUPABASE_URL", "SUPABASE_SECRET_KEY"):
         os.environ.pop(var, None)
 
@@ -79,9 +84,41 @@ def test_get_settings_supabase_defaults_to_none() -> None:
 
 
 def test_get_settings_reads_supabase_env_vars(monkeypatch) -> None:
+    monkeypatch.setenv("LOOP_DISABLE_DOTENV", "1")
     monkeypatch.setenv("SUPABASE_URL", "https://test.supabase.co")
     monkeypatch.setenv("SUPABASE_SECRET_KEY", "secret-key")
 
     settings = get_settings()
     assert settings.supabase_url == "https://test.supabase.co"
     assert settings.supabase_secret_key == "secret-key"
+
+
+def test_get_settings_loads_repo_root_dotenv_when_env_vars_missing(monkeypatch, tmp_path) -> None:
+    monkeypatch.delenv("LOOP_DISABLE_DOTENV", raising=False)
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_SECRET_KEY", raising=False)
+
+    repo_root = tmp_path / "repo"
+    settings_path = repo_root / "services" / "api" / "app" / "core"
+    settings_path.mkdir(parents=True)
+    env_file = repo_root / ".env"
+    env_file.write_text(
+        "SUPABASE_URL=https://dotenv.supabase.co\n"
+        "SUPABASE_SECRET_KEY=dotenv-secret\n"
+    )
+
+    fake_settings_file = settings_path / "settings.py"
+
+    original_resolve = settings_module.Path.resolve
+
+    def fake_resolve(self: Path) -> Path:
+        if self.name == "settings.py":
+            return fake_settings_file
+        return original_resolve(self)
+
+    monkeypatch.setattr(settings_module.Path, "resolve", fake_resolve)
+
+    settings = get_settings()
+
+    assert settings.supabase_url == "https://dotenv.supabase.co"
+    assert settings.supabase_secret_key == "dotenv-secret"

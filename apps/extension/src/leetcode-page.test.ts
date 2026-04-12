@@ -569,6 +569,27 @@ describe("logLeetCodeProblemForDebug", () => {
     infoSpy.mockRestore();
   });
 
+  it("does not log outside debug mode", () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    logLeetCodeProblemForDebug(
+      {
+        slug: "two-sum",
+        title: "Two Sum",
+        difficulty: "Easy",
+        description: "Given an array of integers nums and an integer target.",
+        examples: [],
+        constraints: []
+      },
+      new URL("https://leetcode.com/problems/two-sum/"),
+      false
+    );
+
+    expect(infoSpy).not.toHaveBeenCalled();
+
+    infoSpy.mockRestore();
+  });
+
   it("logs when no problem payload could be extracted", () => {
     const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
 

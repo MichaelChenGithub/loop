@@ -177,6 +177,7 @@ export const startInterviewSessionAttempt = async ({
   await captureLatestCodeSnapshotImpl().catch(() => ({ snapshot: null }));
 
   const authHeader = await getAuthHeader();
+  logLeetCodeProblemForDebug(problem, new URL(locationHref));
   const secret = await fetchClientSecretImpl(
     apiBaseUrl,
     buildProblemPayloadForBackend(problem, new URL(locationHref)),
@@ -308,7 +309,6 @@ export const InterviewOverlay = () => {
     const sync = () => {
       const nextUrl = new URL(window.location.href);
       const nextProblem = extractLeetCodeProblem(document, nextUrl);
-      logLeetCodeProblemForDebug(nextProblem, nextUrl);
 
       const syncResult = applyProblemSyncResult({
         nextProblem,
@@ -508,8 +508,8 @@ export const InterviewOverlay = () => {
       try {
         await authClient.signInWithGoogle();
         setAuthStatus("signed_in");
-      } catch {
-        // flow cancelled or failed — stay on sign-in screen
+      } catch (err) {
+        console.error("[loop] Sign-in failed:", err);
       }
     })();
   }, []);
@@ -659,9 +659,21 @@ export const InterviewOverlay = () => {
 
   const renderPopover = () => {
     if (!state.isPanelExpanded) return null;
-    if (authStatus === "signed_out") return <SignInScreen {...gateScreenProps} onSignIn={handleSignIn} />;
-    if (authStatus === "beta_full")  return <BetaFullScreen {...gateScreenProps} />;
-    if (authStatus === "no_quota")   return <NoQuotaScreen {...gateScreenProps} />;
+    if (authStatus === "signed_out") {
+      return (
+        <SignInScreen
+          {...gateScreenProps}
+          ref={popoverRef}
+          onSignIn={handleSignIn}
+        />
+      );
+    }
+    if (authStatus === "beta_full") {
+      return <BetaFullScreen {...gateScreenProps} ref={popoverRef} />;
+    }
+    if (authStatus === "no_quota") {
+      return <NoQuotaScreen {...gateScreenProps} ref={popoverRef} />;
+    }
     return (
       <ExpandedPanel
         ref={popoverRef}

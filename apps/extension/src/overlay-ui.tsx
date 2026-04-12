@@ -474,14 +474,12 @@ type GateScreenProps = {
   transformOrigin: string;
 };
 
-export const SignInScreen = ({
-  palette,
-  popoverTop,
-  popoverLeft,
-  transformOrigin,
-  onSignIn
-}: GateScreenProps & { onSignIn: () => void }) => (
+export const SignInScreen = forwardRef<
+  HTMLElement,
+  GateScreenProps & { onSignIn: () => void }
+>(({ palette, popoverTop, popoverLeft, transformOrigin, onSignIn }, ref) => (
   <section
+    ref={ref}
     aria-label="Loop sign in"
     style={{
       ...styles.popover,
@@ -515,15 +513,16 @@ export const SignInScreen = ({
       </button>
     </div>
   </section>
-);
+));
 
-export const BetaFullScreen = ({
+export const BetaFullScreen = forwardRef<HTMLElement, GateScreenProps>(({
   palette,
   popoverTop,
   popoverLeft,
   transformOrigin
-}: GateScreenProps) => (
+}, ref) => (
   <section
+    ref={ref}
     aria-label="Loop beta full"
     style={{
       ...styles.popover,
@@ -554,15 +553,16 @@ export const BetaFullScreen = ({
       </a>
     </div>
   </section>
-);
+));
 
-export const NoQuotaScreen = ({
+export const NoQuotaScreen = forwardRef<HTMLElement, GateScreenProps>(({
   palette,
   popoverTop,
   popoverLeft,
   transformOrigin
-}: GateScreenProps) => (
+}, ref) => (
   <section
+    ref={ref}
     aria-label="Loop no quota"
     style={{
       ...styles.popover,
@@ -593,7 +593,7 @@ export const NoQuotaScreen = ({
       </a>
     </div>
   </section>
-);
+));
 
 const styles: Record<string, CSSProperties> = {
   collapsedToolbar: {

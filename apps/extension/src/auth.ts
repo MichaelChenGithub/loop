@@ -1,5 +1,10 @@
 import { createClient, type Session, type SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  LAUNCH_AUTH_FLOW_MESSAGE_TYPE,
+  SIGN_IN_WITH_GOOGLE_MESSAGE_TYPE
+} from "./auth-messages";
+
 // ---------------------------------------------------------------------------
 // Dependency types (injectable for testing)
 // ---------------------------------------------------------------------------
@@ -16,6 +21,10 @@ export type ChromeIdentity = {
     url: string;
     interactive: boolean;
   }) => Promise<string>;
+};
+
+export type ChromeRuntimeMessenger = {
+  sendMessage: (message: unknown) => Promise<unknown>;
 };
 
 // ---------------------------------------------------------------------------
@@ -73,6 +82,7 @@ export function createAuthClient({
           autoRefreshToken: true,
           persistSession: true,
           detectSessionInUrl: false,
+          flowType: "pkce",
         },
       });
     }
@@ -134,6 +144,41 @@ export function createAuthClient({
   };
 }
 
+export function createContentScriptAuthClient({
+  storage,
+  runtime,
+  supabaseUrl,
+  supabaseKey,
+}: {
+  storage: ChromeStorageArea;
+  runtime: ChromeRuntimeMessenger;
+  supabaseUrl: string;
+  supabaseKey: string;
+}): AuthClient {
+  const baseClient = createAuthClient({
+    storage,
+    identity: contentScriptIdentity,
+    supabaseUrl,
+    supabaseKey,
+  });
+
+  return {
+    async signInWithGoogle() {
+      const result: { ok: boolean; error?: string } =
+        await runtime.sendMessage({
+          type: SIGN_IN_WITH_GOOGLE_MESSAGE_TYPE
+        }) as { ok: boolean; error?: string };
+
+      if (!result?.ok) {
+        throw new Error(result?.error ?? "Google sign-in failed");
+      }
+    },
+    getSession: () => baseClient.getSession(),
+    getAuthHeader: () => baseClient.getAuthHeader(),
+    signOut: () => baseClient.signOut(),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Real chrome identity adapter (wraps callback API into Promise)
 // ---------------------------------------------------------------------------
@@ -165,12 +210,54 @@ export const realChromeStorage: ChromeStorageArea = {
 };
 
 // ---------------------------------------------------------------------------
+// Content-script identity adapter
+//
+// chrome.identity is not available in content scripts. This adapter:
+//   - constructs the redirect URL from chrome.runtime.id (available everywhere)
+//   - routes launchWebAuthFlow through the background SW via message passing
+// ---------------------------------------------------------------------------
+
+export const contentScriptIdentity: ChromeIdentity = {
+  getRedirectURL: () => `https://${chrome.runtime.id}.chromiumapp.org/`,
+  launchWebAuthFlow: async (details) => {
+    const result: { ok: boolean; redirectUrl?: string; error?: string } =
+      await chrome.runtime.sendMessage({
+        type: LAUNCH_AUTH_FLOW_MESSAGE_TYPE,
+        url: details.url,
+        interactive: details.interactive
+      });
+    if (!result?.ok) {
+      throw new Error(result?.error ?? "Auth flow failed");
+    }
+    return result.redirectUrl!;
+  }
+};
+
+// ---------------------------------------------------------------------------
 // Singleton using real chrome APIs
 // ---------------------------------------------------------------------------
 
-export const authClient = createAuthClient({
-  storage: realChromeStorage,
-  identity: realChromeIdentity,
-  supabaseUrl: process.env.PLASMO_PUBLIC_SUPABASE_URL ?? "",
-  supabaseKey: process.env.PLASMO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "",
-});
+const unavailableAuthClient: AuthClient = {
+  async signInWithGoogle() {
+    throw new Error("chrome.runtime is not available");
+  },
+  async getSession() {
+    throw new Error("chrome.runtime is not available");
+  },
+  async getAuthHeader() {
+    throw new Error("chrome.runtime is not available");
+  },
+  async signOut() {
+    throw new Error("chrome.runtime is not available");
+  },
+};
+
+export const authClient =
+  typeof chrome !== "undefined" && chrome.runtime
+    ? createContentScriptAuthClient({
+        storage: realChromeStorage,
+        runtime: chrome.runtime,
+        supabaseUrl: process.env.PLASMO_PUBLIC_SUPABASE_URL ?? "",
+        supabaseKey: process.env.PLASMO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "",
+      })
+    : unavailableAuthClient;

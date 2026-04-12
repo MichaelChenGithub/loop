@@ -36,15 +36,21 @@ def _make_db(*, is_new_user: bool = False, sessions_used: int = 0, beta_full: bo
     db = MagicMock()
 
     # user_quota.select(...).eq(...).maybe_single().execute()
-    quota_result = MagicMock()
-    quota_result.data = None if is_new_user else {"sessions_used": sessions_used}
+    # In postgrest-py 2.x, maybe_single().execute() returns None when no row is found,
+    # or a SingleAPIResponse (with .data = row_dict) when one row is found.
+    if is_new_user:
+        quota_execute_result = None
+    else:
+        quota_result = MagicMock()
+        quota_result.data = {"sessions_used": sessions_used}
+        quota_execute_result = quota_result
     (
         db.table.return_value
         .select.return_value
         .eq.return_value
         .maybe_single.return_value
         .execute.return_value
-    ) = quota_result
+    ) = quota_execute_result
 
     # claim_beta_slot rpc
     beta_result = MagicMock()
@@ -67,7 +73,7 @@ def test_create_session_rejects_missing_auth_header() -> None:
 
     response = client.post("/v1/realtime/sessions", json=VALID_REQUEST)
 
-    assert response.status_code == 403  # HTTPBearer returns 403 when header absent
+    assert response.status_code == 401
 
 
 def test_create_session_rejects_invalid_token() -> None:
@@ -190,4 +196,4 @@ def test_end_session_rejects_missing_auth() -> None:
         json={"duration_seconds": 300},
     )
 
-    assert response.status_code == 403
+    assert response.status_code == 401

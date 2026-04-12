@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  LAUNCH_AUTH_FLOW_MESSAGE_TYPE,
+  SIGN_IN_WITH_GOOGLE_MESSAGE_TYPE
+} from "./auth-messages";
 import { createAuthClient, type ChromeIdentity, type ChromeStorageArea } from "./auth";
 
 // ---------------------------------------------------------------------------
@@ -61,15 +65,42 @@ describe("createAuthClient", () => {
   // We mock the Supabase createClient at module level so we can control the
   // returned client without making real network calls.
   let supabaseMock: ReturnType<typeof makeSupabaseMock>;
+  let createClientMock: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     supabaseMock = makeSupabaseMock({
       session: { access_token: "token-abc" },
     });
 
+    createClientMock = vi.fn(() => supabaseMock);
     vi.doMock("@supabase/supabase-js", () => ({
-      createClient: vi.fn(() => supabaseMock),
+      createClient: createClientMock,
     }));
+  });
+
+  it("initializes Supabase auth with PKCE flow", async () => {
+    const { createAuthClient: create } = await import("./auth");
+    const client = create({
+      storage: makeStorage(),
+      identity: makeIdentity(),
+      supabaseUrl: "https://test.supabase.co",
+      supabaseKey: "anon-key",
+    });
+
+    await client.getSession();
+
+    expect(createClientMock).toHaveBeenCalledWith(
+      "https://test.supabase.co",
+      "anon-key",
+      expect.objectContaining({
+        auth: expect.objectContaining({
+          flowType: "pkce",
+          detectSessionInUrl: false,
+          autoRefreshToken: true,
+          persistSession: true,
+        }),
+      }),
+    );
   });
 
   it("getAuthHeader returns a Bearer header when a session exists", async () => {
@@ -169,5 +200,87 @@ describe("createAuthClient", () => {
     await client.signOut();
 
     expect(supabaseMock.auth.signOut).toHaveBeenCalledOnce();
+  });
+});
+
+describe("contentScriptIdentity", () => {
+  it("builds the chromiumapp redirect URL from chrome.runtime.id", async () => {
+    vi.stubGlobal("chrome", {
+      runtime: {
+        id: "abcdefghijklmnop",
+        sendMessage: vi.fn(),
+      },
+    });
+
+    const { contentScriptIdentity } = await import("./auth");
+
+    expect(contentScriptIdentity.getRedirectURL()).toBe(
+      "https://abcdefghijklmnop.chromiumapp.org/",
+    );
+  });
+
+  it("routes launchWebAuthFlow through the background service worker", async () => {
+    const sendMessage = vi.fn().mockResolvedValue({
+      ok: true,
+      redirectUrl: "https://abcdefghijklmnop.chromiumapp.org/?code=auth-code",
+    });
+
+    vi.stubGlobal("chrome", {
+      runtime: {
+        id: "abcdefghijklmnop",
+        sendMessage,
+      },
+    });
+
+    const { contentScriptIdentity } = await import("./auth");
+
+    await expect(
+      contentScriptIdentity.launchWebAuthFlow({
+        url: "https://accounts.google.com/o/oauth2/auth?...",
+        interactive: true,
+      }),
+    ).resolves.toBe("https://abcdefghijklmnop.chromiumapp.org/?code=auth-code");
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: LAUNCH_AUTH_FLOW_MESSAGE_TYPE,
+      url: "https://accounts.google.com/o/oauth2/auth?...",
+      interactive: true,
+    });
+  });
+});
+
+describe("createContentScriptAuthClient", () => {
+  it("routes Google sign-in through the background worker", async () => {
+    const sendMessage = vi.fn().mockResolvedValue({ ok: true });
+
+    vi.stubGlobal("chrome", {
+      runtime: {
+        id: "abcdefghijklmnop",
+        sendMessage
+      },
+      storage: {
+        local: {
+          get: vi.fn(),
+          set: vi.fn(),
+          remove: vi.fn()
+        }
+      }
+    });
+
+    const { createContentScriptAuthClient } = await import("./auth");
+    const client = createContentScriptAuthClient({
+      storage: makeStorage(),
+      runtime: {
+        sendMessage
+      } as never,
+      supabaseUrl: "https://test.supabase.co",
+      supabaseKey: "anon-key"
+    });
+
+    await client.signInWithGoogle();
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: SIGN_IN_WITH_GOOGLE_MESSAGE_TYPE
+    });
   });
 });
